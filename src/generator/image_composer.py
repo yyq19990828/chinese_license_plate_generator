@@ -1,0 +1,388 @@
+"""
+车牌图像合成器模块
+
+负责将车牌号码、背景底板和字体资源合成为最终的车牌图像。
+支持不同车牌类型的自动布局计算、字符颜色判断和双层车牌处理。
+"""
+
+from typing import Tuple, List, Optional, Dict, Any
+import numpy as np
+import cv2
+import os
+from dataclasses import dataclass
+
+from .plate_generator import PlateInfo
+from ..utils.constants import PlateType
+from ..core.exceptions import PlateGenerationError
+
+
+@dataclass
+class CharacterPosition:
+    """字符位置信息"""
+    x1: int
+    y1: int  
+    x2: int
+    y2: int
+    is_red: bool = False  # 是否红色字符
+
+
+@dataclass
+class PlateLayout:
+    """车牌布局信息"""
+    width: int
+    height: int
+    character_positions: List[CharacterPosition]
+    background_path: str
+    font_prefix: str  # 字体文件前缀
+
+
+class ImageComposer:
+    """
+    图像合成器
+    
+    负责车牌图像的合成，包括：
+    1. 基于车牌类型的自动布局计算
+    2. 字符颜色的自动判断
+    3. 双层车牌的支持
+    4. 图像增强和后处理
+    """
+    
+    def __init__(self, plate_models_dir: str, font_models_dir: str):
+        """
+        初始化图像合成器
+        
+        Args:
+            plate_models_dir: 车牌底板资源目录
+            font_models_dir: 字体资源目录
+        """
+        self.plate_models_dir = plate_models_dir
+        self.font_models_dir = font_models_dir
+        
+        # 预定义的车牌尺寸和布局参数
+        self.layout_configs = self._initialize_layout_configs()
+        
+    def compose_plate_image(self, plate_info: PlateInfo, enhance: bool = False) -> np.ndarray:
+        """
+        合成车牌图像
+        
+        Args:
+            plate_info: 车牌信息
+            enhance: 是否启用图像增强
+            
+        Returns:
+            np.ndarray: 合成的车牌图像
+            
+        Raises:
+            PlateGenerationError: 合成失败时抛出
+        """
+        try:
+            # 计算布局
+            layout = self._calculate_layout(plate_info)
+            
+            # 加载底板图像
+            background_img = self._load_background_image(layout.background_path, layout.width, layout.height)
+            
+            # 逐个合成字符
+            for i, char in enumerate(plate_info.plate_number):
+                if i >= len(layout.character_positions):
+                    break
+                    
+                char_pos = layout.character_positions[i]
+                
+                # 加载字符图像
+                char_img = self._load_character_image(char, layout.font_prefix, plate_info, i)
+                
+                # 应用图像增强
+                if enhance:
+                    char_img = self._apply_character_enhancement(char_img)
+                
+                # 合成到背景上
+                background_img = self._compose_character(
+                    background_img, char_img, char_pos, 
+                    plate_info.background_color, char_pos.is_red
+                )
+            
+            # 最终后处理
+            final_img = self._apply_final_processing(background_img)
+            
+            return final_img
+            
+        except Exception as e:
+            raise PlateGenerationError(f"图像合成失败: {str(e)}")
+    
+    def _initialize_layout_configs(self) -> Dict[str, Dict]:
+        """初始化布局配置"""
+        return {
+            # 单层车牌配置
+            "single_7": {  # 7位单层车牌
+                "width": 440,
+                "height": 140,
+                "char_width": 45,
+                "char_height": 90,
+                "y_offset": 25,
+                "split_gap": 34,  # 分隔符间距
+                "char_gap": 12,   # 字符间距
+                "split_position": 2  # 分隔符位置(第2位后)
+            },
+            "single_8": {  # 8位单层车牌(新能源)
+                "width": 480,
+                "height": 140,
+                "char_width": 43,
+                "char_height": 90,
+                "y_offset": 25,
+                "split_gap": 49,
+                "char_gap": 9,
+                "split_position": 2
+            },
+            # 双层车牌配置
+            "double_7": {  # 7位双层车牌
+                "width": 440,
+                "height": 220,
+                "char_width_top": 80,   # 上层字符宽度
+                "char_height_top": 60,  # 上层字符高度
+                "char_width_bottom": 65, # 下层字符宽度
+                "char_height_bottom": 110, # 下层字符高度
+                "top_y_offset": 15,     # 上层Y偏移
+                "bottom_y_offset": 90,  # 下层Y偏移
+                "char_gap": 15,
+                "top_positions": [(110, 250)],  # 上层两个字符的X坐标范围
+                "bottom_positions": [27, 107, 187, 267, 347]  # 下层5个字符的X坐标
+            }
+        }
+    
+    def _calculate_layout(self, plate_info: PlateInfo) -> PlateLayout:
+        """
+        计算车牌布局
+        
+        Args:
+            plate_info: 车牌信息
+            
+        Returns:
+            PlateLayout: 布局信息
+        """
+        plate_length = len(plate_info.plate_number)
+        is_double = plate_info.is_double_layer
+        
+        # 确定配置键
+        if is_double:
+            config_key = f"double_{plate_length}"
+        else:
+            config_key = f"single_{plate_length}"
+        
+        if config_key not in self.layout_configs:
+            # 使用默认配置
+            config_key = "single_7"
+        
+        config = self.layout_configs[config_key]
+        
+        # 计算字符位置
+        if is_double:
+            positions = self._calculate_double_layer_positions(plate_info, config)
+        else:
+            positions = self._calculate_single_layer_positions(plate_info, config)
+        
+        # 确定背景图片路径和字体前缀
+        bg_path = self._get_background_path(plate_info, config["width"], config["height"])
+        font_prefix = self._get_font_prefix(plate_info)
+        
+        return PlateLayout(
+            width=config["width"],
+            height=config["height"],
+            character_positions=positions,
+            background_path=bg_path,
+            font_prefix=font_prefix
+        )
+    
+    def _calculate_single_layer_positions(self, plate_info: PlateInfo, config: Dict) -> List[CharacterPosition]:
+        """计算单层车牌字符位置"""
+        positions = []
+        plate_number = plate_info.plate_number
+        
+        # 确定分隔位置
+        split_pos = self._get_split_position(plate_info)
+        
+        for i, char in enumerate(plate_number):
+            # 计算X坐标
+            if i == 0:
+                x = 15  # 首字符起始位置
+            elif i == split_pos:
+                x = positions[i-1].x2 + config["split_gap"]
+            else:
+                x = positions[i-1].x2 + config["char_gap"]
+            
+            # 新能源车牌第一位后字符宽度调整
+            char_width = config["char_width"]
+            if len(plate_number) == 8 and i > 0:
+                char_width = 43
+            
+            # 判断是否红色字符
+            is_red = self._is_red_character(char, i, plate_info)
+            
+            position = CharacterPosition(
+                x1=x,
+                y1=config["y_offset"],
+                x2=x + char_width,
+                y2=config["y_offset"] + config["char_height"],
+                is_red=is_red
+            )
+            positions.append(position)
+        
+        return positions
+    
+    def _calculate_double_layer_positions(self, plate_info: PlateInfo, config: Dict) -> List[CharacterPosition]:
+        """计算双层车牌字符位置"""
+        positions = []
+        plate_number = plate_info.plate_number
+        
+        for i, char in enumerate(plate_number):
+            is_red = self._is_red_character(char, i, plate_info)
+            
+            if i < 2:  # 上层字符
+                x_positions = [110, 250]  # 预定义的上层X坐标
+                position = CharacterPosition(
+                    x1=x_positions[i],
+                    y1=config["top_y_offset"],
+                    x2=x_positions[i] + config["char_width_top"],
+                    y2=config["top_y_offset"] + config["char_height_top"],
+                    is_red=is_red
+                )
+            else:  # 下层字符
+                bottom_index = i - 2
+                x_positions = [27, 107, 187, 267, 347]  # 预定义的下层X坐标
+                if bottom_index < len(x_positions):
+                    x = x_positions[bottom_index]
+                else:
+                    x = x_positions[-1] + (bottom_index - len(x_positions) + 1) * 80
+                
+                position = CharacterPosition(
+                    x1=x,
+                    y1=config["bottom_y_offset"],
+                    x2=x + config["char_width_bottom"],
+                    y2=config["bottom_y_offset"] + config["char_height_bottom"],
+                    is_red=is_red
+                )
+            
+            positions.append(position)
+        
+        return positions
+    
+    def _get_split_position(self, plate_info: PlateInfo) -> int:
+        """获取分隔符位置"""
+        plate_number = plate_info.plate_number
+        
+        # 根据特殊字符确定分隔位置
+        if '警' in plate_number:
+            return 1
+        elif '使' in plate_number:
+            return 4
+        else:
+            return 2  # 默认第2位后分隔
+    
+    def _is_red_character(self, char: str, position: int, plate_info: PlateInfo) -> bool:
+        """判断字符是否为红色"""
+        plate_number = plate_info.plate_number
+        
+        # 军车首字母红色
+        if position == 0 and char.isalpha() and char not in ['京', '津', '冀', '晋', '蒙', '辽', '吉', '黑', '沪', '苏', '浙', '皖', '闽', '赣', '鲁', '豫', '鄂', '湘', '粤', '桂', '琼', '渝', '川', '贵', '云', '藏', '陕', '甘', '青', '宁', '新']:
+            return True
+        
+        # 军车第二位字母随机红色
+        if position == 1 and plate_number[0].isalpha() and char.isalpha():
+            return np.random.random() > 0.5
+        
+        # 特殊字符红色
+        if char in ['警', '使', '领']:
+            return True
+        
+        return False
+    
+    def _get_background_path(self, plate_info: PlateInfo, width: int, height: int) -> str:
+        """获取背景图片路径"""
+        bg_color = plate_info.background_color
+        filename = f"{bg_color}_{height}.PNG"
+        return os.path.join(self.plate_models_dir, filename)
+    
+    def _get_font_prefix(self, plate_info: PlateInfo) -> str:
+        """获取字体文件前缀"""
+        if len(plate_info.plate_number) == 8:  # 新能源车牌
+            return "green"
+        elif plate_info.is_double_layer:
+            return "220"
+        else:
+            return "140"
+    
+    def _load_background_image(self, bg_path: str, width: int, height: int) -> np.ndarray:
+        """加载并调整背景图像"""
+        if not os.path.exists(bg_path):
+            raise PlateGenerationError(f"背景图片不存在: {bg_path}")
+        
+        img = cv2.imread(bg_path)
+        if img is None:
+            raise PlateGenerationError(f"无法加载背景图片: {bg_path}")
+        
+        return cv2.resize(img, (width, height))
+    
+    def _load_character_image(self, char: str, font_prefix: str, plate_info: PlateInfo, position: int) -> np.ndarray:
+        """加载字符图像"""
+        # 构建字符文件名
+        if font_prefix == "220":  # 双层车牌
+            if position < 2:
+                filename = f"220_up_{char}.jpg"
+            else:
+                filename = f"220_down_{char}.jpg"
+        else:
+            filename = f"{font_prefix}_{char}.jpg"
+        
+        char_path = os.path.join(self.font_models_dir, filename)
+        
+        if not os.path.exists(char_path):
+            raise PlateGenerationError(f"字符图片不存在: {char_path}")
+        
+        # 使用中文文件名兼容的读取方式
+        char_img = cv2.imdecode(np.fromfile(char_path, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
+        
+        if char_img is None:
+            raise PlateGenerationError(f"无法加载字符图片: {char_path}")
+        
+        return char_img
+    
+    def _apply_character_enhancement(self, char_img: np.ndarray) -> np.ndarray:
+        """应用字符图像增强"""
+        # 随机应用腐蚀或膨胀操作
+        kernel_size = np.random.randint(1, 6)
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        if np.random.random() > 0.5:
+            return cv2.erode(char_img, kernel, iterations=1)
+        else:
+            return cv2.dilate(char_img, kernel, iterations=1)
+    
+    def _compose_character(self, background: np.ndarray, char_img: np.ndarray, 
+                          position: CharacterPosition, bg_color: str, is_red: bool) -> np.ndarray:
+        """将字符合成到背景上"""
+        x1, y1, x2, y2 = position.x1, position.y1, position.x2, position.y2
+        
+        # 调整字符图像大小
+        char_img_resized = cv2.resize(char_img, (x2 - x1, y2 - y1))
+        
+        # 获取背景区域
+        bg_region = background[y1:y2, x1:x2, :]
+        
+        # 根据字符颜色和背景色设置文字颜色
+        if is_red:
+            text_color = [0, 0, 255]  # 红色
+        elif 'blue' in bg_color or 'black' in bg_color:
+            text_color = [255, 255, 255]  # 白色
+        else:
+            text_color = [0, 0, 0]  # 黑色
+        
+        # 应用字符到背景(阈值200作为透明度判断)
+        mask = char_img_resized < 200
+        bg_region[mask] = text_color
+        
+        return background
+    
+    def _apply_final_processing(self, img: np.ndarray) -> np.ndarray:
+        """应用最终图像处理"""
+        # 轻微模糊以模拟真实车牌效果
+        return cv2.blur(img, (3, 3))

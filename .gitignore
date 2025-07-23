@@ -1,0 +1,14 @@
+.claude/
+.mcp.json
+PRPs/
+.serena/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+build/
+dist/
+*.egg-info/
