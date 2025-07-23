@@ -82,7 +82,7 @@ class SequenceResourceManager:
         Returns:
             bool: True表示可用
         """
-        return self.get_usage_rate(pattern_key) < self.threshold
+        return self.get_usage_rate(pattern_key) <= self.threshold
     
     def get_available_patterns(self, patterns: List[SequencePattern]) -> List[SequencePattern]:
         """

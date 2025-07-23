@@ -86,6 +86,7 @@ class SpecialPlateRule(BaseRule):
             self.special_chars = ["使"]
             self.red_chars = ["使"]
             self.is_double_layer = False
+            self.sequence_length = 6
             
         elif self.sub_type == SpecialPlateSubType.CONSULATE:
             self.plate_type = PlateType.CONSULATE
@@ -94,6 +95,7 @@ class SpecialPlateRule(BaseRule):
             self.special_chars = ["领"]
             self.red_chars = ["领"]
             self.is_double_layer = False
+            self.sequence_length = 6
             
         elif self.sub_type == SpecialPlateSubType.HONG_KONG_MACAO:
             self.plate_type = PlateType.HONG_KONG_MACAO
@@ -102,6 +104,7 @@ class SpecialPlateRule(BaseRule):
             self.special_chars = []  # 会根据具体类型设置港或澳
             self.red_chars = []  # 港澳字符为白色
             self.is_double_layer = False
+            self.sequence_length = 5
             
         elif self.sub_type == SpecialPlateSubType.MILITARY:
             self.plate_type = PlateType.MILITARY
@@ -393,28 +396,27 @@ class SpecialPlateRule(BaseRule):
         
         # 根据特殊车牌类型处理省份和地区代号
         if self.sub_type in [SpecialPlateSubType.EMBASSY, SpecialPlateSubType.CONSULATE]:
-            # 使馆、领馆车牌使用特殊标识
+            # 使馆、领馆车牌的省份和地区代码实际上就是特殊字符本身
             if self.sub_type == SpecialPlateSubType.EMBASSY:
                 province = "使"
-                regional_code = "使"
             else:
                 province = "领"
-                regional_code = "领"
+            regional_code = ""  # 地区代码为空
                 
         elif self.sub_type == SpecialPlateSubType.HONG_KONG_MACAO:
             # 港澳车牌
             if special_type == "hong_kong":
-                province = "港"
-                regional_code = "港"
+                province = "粤"
+                regional_code = "Z"
                 self.special_chars = ["港"]
             elif special_type == "macao":
-                province = "澳"
-                regional_code = "澳"
+                province = "粤"
+                regional_code = "Z"
                 self.special_chars = ["澳"]
             else:
                 # 默认为港牌
-                province = "港"
-                regional_code = "港"
+                province = "粤"
+                regional_code = "Z"
                 self.special_chars = ["港"]
         
         # 构造完整车牌号码
@@ -435,6 +437,20 @@ class SpecialPlateRule(BaseRule):
         )
         
         return plate_info
+
+    def format_plate_number(self, province: str, regional_code: str, sequence: str) -> str:
+        """
+        重写格式化方法以处理特殊车牌
+        """
+        if self.sub_type in [SpecialPlateSubType.EMBASSY, SpecialPlateSubType.CONSULATE]:
+            # 使领馆车牌格式: 使/领 + 序号
+            return f"{province}{sequence}"
+        
+        if self.sub_type == SpecialPlateSubType.HONG_KONG_MACAO:
+            # 港澳车牌格式: 粤Z + 序号 + 港/澳
+            return f"{province}{regional_code}{sequence}{self.special_chars[0]}"
+
+        return super().format_plate_number(province, regional_code, sequence)
     
     def generate_plate(self, 
                       province: str = "",
@@ -453,7 +469,20 @@ class SpecialPlateRule(BaseRule):
         Returns:
             PlateInfo: 生成的车牌信息
         """
-        # 生成序号
+        # 军牌需要特殊处理，因为它不使用传统的省份和地区代码
+        if self.sub_type == SpecialPlateSubType.MILITARY:
+            # 1. 生成完整的军牌号码（例如 "WJ1234"）
+            full_sequence = self.generate_sequence(province, regional_code, special_type, **kwargs)
+            
+            # 2. 解析军牌结构
+            prov = full_sequence[0]  # 省份/军种
+            reg_code = full_sequence[1] # 地区代码
+            seq = full_sequence[2:]   # 序号
+            
+            # 3. 直接使用解析后的结构创建 PlateInfo
+            return self.get_plate_info(prov, reg_code, seq, special_type)
+
+        # 其他特殊车牌（使、领、港澳）的逻辑
         sequence = self.generate_sequence(
             province=province,
             regional_code=regional_code,
@@ -510,7 +539,7 @@ class SpecialPlateRuleFactory:
     """
     
     @staticmethod
-    def create_rule(sub_type: SpecialPlateSubType) -> SpecialPlateRule:
+    def create_rule(sub_type: [str, SpecialPlateSubType]) -> "SpecialPlateRule":
         """
         创建特殊车牌规则
         
@@ -520,7 +549,11 @@ class SpecialPlateRuleFactory:
         Returns:
             SpecialPlateRule: 规则对象
         """
-        return SpecialPlateRule(sub_type)
+        if isinstance(sub_type, str):
+            st = SpecialPlateSubType(sub_type)
+        else:
+            st = sub_type
+        return SpecialPlateRule(st)
     
     @staticmethod
     def create_embassy_rule() -> SpecialPlateRule:

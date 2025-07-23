@@ -257,6 +257,18 @@ class PlateGenerationError(PlateGeneratorException):
         super().__init__(message, details)
 
 
+class PlateNumberError(PlateGeneratorException):
+    """车牌号码错误异常"""
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+class RuleError(PlateGeneratorException):
+    """规则错误异常"""
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
 # 异常处理工具函数
 def format_exception_message(exception: PlateGeneratorException) -> str:
     """

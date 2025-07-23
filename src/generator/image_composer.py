@@ -10,10 +10,13 @@ import numpy as np
 import cv2
 import os
 from dataclasses import dataclass
+import logging
 
 from .plate_generator import PlateInfo
+from ..rules.base_rule import PlateColor
 from ..utils.constants import PlateType
 from ..core.exceptions import PlateGenerationError
+
 
 
 @dataclass
@@ -75,9 +78,11 @@ class ImageComposer:
         Raises:
             PlateGenerationError: 合成失败时抛出
         """
+        logging.info(f"开始合成车牌图像: {plate_info.plate_number}, 类型: {plate_info.plate_type}, 背景: {plate_info.background_color}")
         try:
             # 计算布局
             layout = self._calculate_layout(plate_info)
+            logging.info(f"使用布局: 宽度={layout.width}, 高度={layout.height}, 字体前缀='{layout.font_prefix}'")
             
             # 加载底板图像
             background_img = self._load_background_image(layout.background_path, layout.width, layout.height)
@@ -85,6 +90,7 @@ class ImageComposer:
             # 逐个合成字符
             for i, char in enumerate(plate_info.plate_number):
                 if i >= len(layout.character_positions):
+                    logging.warning(f"字符 '{char}' 超出布局位置数量，将被忽略。")
                     break
                     
                 char_pos = layout.character_positions[i]
@@ -105,9 +111,11 @@ class ImageComposer:
             # 最终后处理
             final_img = self._apply_final_processing(background_img)
             
+            logging.info(f"车牌图像合成成功: {plate_info.plate_number}")
             return final_img
             
         except Exception as e:
+            logging.error(f"图像合成失败: {plate_info.plate_number}", exc_info=True)
             raise PlateGenerationError(f"图像合成失败: {str(e)}")
     
     def _initialize_layout_configs(self) -> Dict[str, Dict]:
@@ -171,6 +179,7 @@ class ImageComposer:
         
         if config_key not in self.layout_configs:
             # 使用默认配置
+            logging.warning(f"未找到布局配置 '{config_key}', 将使用 'single_7' 作为默认配置。")
             config_key = "single_7"
         
         config = self.layout_configs[config_key]
@@ -280,19 +289,18 @@ class ImageComposer:
     
     def _is_red_character(self, char: str, position: int, plate_info: PlateInfo) -> bool:
         """判断字符是否为红色"""
-        plate_number = plate_info.plate_number
-        
-        # 军车首字母红色
-        if position == 0 and char.isalpha() and char not in ['京', '津', '冀', '晋', '蒙', '辽', '吉', '黑', '沪', '苏', '浙', '皖', '闽', '赣', '鲁', '豫', '鄂', '湘', '粤', '桂', '琼', '渝', '川', '贵', '云', '藏', '陕', '甘', '青', '宁', '新']:
-            return True
-        
-        # 军车第二位字母随机红色
-        if position == 1 and plate_number[0].isalpha() and char.isalpha():
-            return np.random.random() > 0.5
-        
-        # 特殊字符红色
+        # 特殊字符 ‘警’, ‘使’, ‘领’ 总是红色
         if char in ['警', '使', '领']:
             return True
+
+        # 仅当车牌类型为军牌时，才应用其他红色字符规则
+        if plate_info.plate_type == PlateType.MILITARY_WHITE:
+            # 军牌的第一个字符（军种字母）是红色
+            if position == 0:
+                return True
+            # 军牌的第二个字符（地区字母）有50%的几率是红色
+            if position == 1 and char.isalpha():
+                return np.random.random() > 0.5
         
         return False
     
@@ -303,10 +311,18 @@ class ImageComposer:
         return os.path.join(self.plate_models_dir, filename)
     
     def _get_font_prefix(self, plate_info: PlateInfo) -> str:
-        """获取字体文件前缀"""
-        if len(plate_info.plate_number) == 8:  # 新能源车牌
+        """根据车牌信息获取正确的字体文件前缀"""
+        if plate_info.plate_type == PlateType.NEW_ENERGY_GREEN:
             return "green"
-        elif plate_info.is_double_layer:
+        
+        # 对于黑色背景的车牌（使领馆、港澳），没有特定的字体前缀，使用标准字体
+        if plate_info.background_color in ["black", "black_shi"]:
+            if plate_info.is_double_layer:
+                return "220"
+            else:
+                return "140"
+
+        if plate_info.is_double_layer:
             return "220"
         else:
             return "140"
@@ -334,10 +350,17 @@ class ImageComposer:
             filename = f"{font_prefix}_{char}.jpg"
         
         char_path = os.path.join(self.font_models_dir, filename)
+        logging.info(f"尝试加载字符图像: {char_path}")
         
         if not os.path.exists(char_path):
-            raise PlateGenerationError(f"字符图片不存在: {char_path}")
-        
+            # 如果特定前缀的字体不存在，尝试使用通用的 '140' 字体作为备选
+            fallback_filename = f"140_{char}.jpg"
+            fallback_path = os.path.join(self.font_models_dir, fallback_filename)
+            logging.warning(f"'{char_path}' 不存在，尝试使用备选字体 '{fallback_path}'")
+            if not os.path.exists(fallback_path):
+                raise PlateGenerationError(f"字符图片及其备选方案均不存在: {char_path}, {fallback_path}")
+            char_path = fallback_path
+
         # 使用中文文件名兼容的读取方式
         char_img = cv2.imdecode(np.fromfile(char_path, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
         

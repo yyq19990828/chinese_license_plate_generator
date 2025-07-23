@@ -444,7 +444,7 @@ class NewEnergyPlateRuleFactory:
     """
     
     @staticmethod
-    def create_rule(sub_type: NewEnergyPlateSubType) -> NewEnergyPlateRule:
+    def create_rule(sub_type: [str, NewEnergyPlateSubType]) -> "NewEnergyPlateRule":
         """
         创建新能源汽车号牌规则
         
@@ -454,7 +454,16 @@ class NewEnergyPlateRuleFactory:
         Returns:
             NewEnergyPlateRule: 规则对象
         """
-        return NewEnergyPlateRule(sub_type)
+        if isinstance(sub_type, str):
+            if "small" in sub_type:
+                st = NewEnergyPlateSubType.SMALL_CAR
+            elif "large" in sub_type:
+                st = NewEnergyPlateSubType.LARGE_CAR
+            else:
+                raise ValueError(f"Invalid sub_type string: {sub_type}")
+        else:
+            st = sub_type
+        return NewEnergyPlateRule(st)
     
     @staticmethod
     def create_small_car_rule() -> NewEnergyPlateRule:

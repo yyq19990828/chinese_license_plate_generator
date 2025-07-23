@@ -10,9 +10,11 @@ from pydantic import BaseModel
 import random
 
 from ..rules.ordinary_plate import OrdinaryPlateRuleFactory, OrdinaryPlateSubType
-from ..rules.new_energy_plate import NewEnergyPlateRuleFactory  
+from ..rules.new_energy_plate import NewEnergyPlateRuleFactory
+from ..rules.province_codes import ProvinceManager
+from ..rules.regional_codes import RegionalCodeManager
 from ..rules.special_plate import SpecialPlateRuleFactory
-from ..utils.constants import PlateType, PROVINCE_CODES
+from ..utils.constants import PlateType
 from ..core.exceptions import PlateGenerationError
 
 
@@ -42,10 +44,16 @@ class PlateGenerator:
     主车牌生成器
     
     整合所有车牌规则，提供统一的生成接口。
+    这是与外部交互的主要类。
     """
     
     def __init__(self):
-        """初始化生成器"""
+        """
+        初始化生成器。
+        
+        在初始化过程中，会加载所有车牌类型的规则工厂，
+        并设置一个符合真实世界情况的车牌类型生成权重。
+        """
         # 初始化规则工厂
         self.ordinary_factory = OrdinaryPlateRuleFactory()
         self.new_energy_factory = NewEnergyPlateRuleFactory()
@@ -63,16 +71,22 @@ class PlateGenerator:
         
     def generate_random_plate(self, config: Optional[PlateGenerationConfig] = None) -> PlateInfo:
         """
-        随机生成车牌
+        随机生成一个符合GA 36-2018标准的车牌。
         
+        可以不提供任何配置，生成器会根据内置的权重随机选择车牌类型。
+        也可以通过 `PlateGenerationConfig` 提供详细的生成参数，如省份、
+        地区、车牌类型等。
+
         Args:
-            config: 生成配置，可指定特定参数
+            config (Optional[PlateGenerationConfig]): 
+                生成配置。如果为None，则完全随机生成。
+                可以指定 `plate_type`, `province`, `regional_code` 等参数。
             
         Returns:
-            PlateInfo: 车牌信息
+            PlateInfo: 包含车牌号码、类型、颜色等信息的详细数据结构。
             
         Raises:
-            PlateGenerationError: 生成失败时抛出
+            PlateGenerationError: 如果根据提供的配置无法生成车牌，则抛出此异常。
         """
         if config is None:
             config = PlateGenerationConfig()
@@ -98,16 +112,19 @@ class PlateGenerator:
     
     def generate_specific_plate(self, plate_number: str) -> PlateInfo:
         """
-        生成指定号码的车牌
+        根据给定的车牌号码字符串，分析其结构并生成对应的车牌信息。
+        
+        此方法会尝试自动识别车牌类型（如新能源、警车等），并解析出
+        省份、地区代码和序号。
         
         Args:
-            plate_number: 车牌号码
+            plate_number (str): 要生成的车牌号码字符串。
             
         Returns:
-            PlateInfo: 车牌信息
+            PlateInfo: 包含分析出的车牌信息的详细数据结构。
             
         Raises:
-            PlateGenerationError: 生成失败时抛出
+            PlateGenerationError: 如果车牌号码格式无效或无法解析，则抛出此异常。
         """
         try:
             # 分析号码确定车牌类型
@@ -138,14 +155,17 @@ class PlateGenerator:
     
     def generate_batch_plates(self, count: int, config: Optional[PlateGenerationConfig] = None) -> List[PlateInfo]:
         """
-        批量生成车牌
+        批量生成车牌。
+        
+        可以像 `generate_random_plate` 一样提供配置。如果生成过程中
+        遇到错误，会跳过当前失败的生成并继续尝试，直到达到指定数量。
         
         Args:
-            count: 生成数量
-            config: 生成配置
+            count (int): 要生成的车牌数量。
+            config (Optional[PlateGenerationConfig]): 应用于所有生成车牌的配置。
             
         Returns:
-            List[PlateInfo]: 车牌信息列表
+            List[PlateInfo]: 生成的车牌信息列表。
         """
         plates = []
         for _ in range(count):
@@ -191,19 +211,17 @@ class PlateGenerator:
             )
         else:
             # 随机选择省份和地区代号
-            from ..rules.province_codes import ProvinceManager
-            from ..rules.regional_codes import RegionalCodeManager
-            
             if config.province:
                 province = config.province
             else:
-                province = random.choice(PROVINCE_CODES)
+                province = random.choice(ProvinceManager.get_all_abbreviations())
             
             if config.regional_code:
                 regional_code = config.regional_code
             else:
-                regional_mgr = RegionalCodeManager()
-                available_codes = list(regional_mgr.get_available_codes(province))
+                available_codes = RegionalCodeManager.get_all_codes_for_province(province)
+                if not available_codes:
+                    raise PlateGenerationError(f"省份 {province} 没有可用的地区代号")
                 regional_code = random.choice(available_codes)
             
             plate_info = rule.generate_plate(province, regional_code)
@@ -249,19 +267,17 @@ class PlateGenerator:
             )
         else:
             # 随机选择省份和地区代号
-            from ..rules.province_codes import ProvinceManager
-            from ..rules.regional_codes import RegionalCodeManager
-            
             if config.province:
                 province = config.province
             else:
-                province = random.choice(PROVINCE_CODES)
+                province = random.choice(ProvinceManager.get_all_abbreviations())
             
             if config.regional_code:
                 regional_code = config.regional_code
             else:
-                regional_mgr = RegionalCodeManager()
-                available_codes = list(regional_mgr.get_available_codes(province))
+                available_codes = RegionalCodeManager.get_all_codes_for_province(province)
+                if not available_codes:
+                    raise PlateGenerationError(f"省份 {province} 没有可用的地区代号")
                 regional_code = random.choice(available_codes)
             
             plate_info = rule.generate_plate(province, regional_code)
@@ -291,9 +307,9 @@ class PlateGenerator:
         elif plate_type == PlateType.MILITARY_WHITE:
             rule = self.special_factory.create_rule("military")
         elif plate_type == PlateType.HONGKONG_BLACK:
-            rule = self.special_factory.create_rule("hongkong")
+            rule = self.special_factory.create_rule("hong_kong_macao")
         elif plate_type == PlateType.MACAO_BLACK:
-            rule = self.special_factory.create_rule("macao")
+            rule = self.special_factory.create_rule("hong_kong_macao")
         else:
             rule = self.special_factory.create_rule("embassy")
         
@@ -305,19 +321,17 @@ class PlateGenerator:
             )
         else:
             # 随机选择省份和地区代号
-            from ..rules.province_codes import ProvinceManager
-            from ..rules.regional_codes import RegionalCodeManager
-            
             if config.province:
                 province = config.province
             else:
-                province = random.choice(PROVINCE_CODES)
+                province = random.choice(ProvinceManager.get_all_abbreviations())
             
             if config.regional_code:
                 regional_code = config.regional_code
             else:
-                regional_mgr = RegionalCodeManager()
-                available_codes = list(regional_mgr.get_available_codes(province))
+                available_codes = RegionalCodeManager.get_all_codes_for_province(province)
+                if not available_codes:
+                    raise PlateGenerationError(f"省份 {province} 没有可用的地区代号")
                 regional_code = random.choice(available_codes)
             
             plate_info = rule.generate_plate(province, regional_code)
@@ -364,7 +378,7 @@ class PlateGenerator:
             return PlateType.ORDINARY_COACH
         elif '挂' in plate_number:
             return PlateType.ORDINARY_TRAILER
-        elif plate_number[0].isalpha() and plate_number[0] not in PROVINCE_CODES:
+        elif plate_number[0].isalpha() and plate_number[0] not in ProvinceManager.get_all_abbreviations():
             return PlateType.MILITARY_WHITE
         
         # 默认为普通蓝牌

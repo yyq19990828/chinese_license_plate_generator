@@ -244,6 +244,13 @@ class OrdinaryPlateRule(BaseRule):
             force_pattern=force_pattern,
             **kwargs
         )
+
+        if self.sub_type == OrdinaryPlateSubType.POLICE:
+            sequence = sequence[:-1] + '警'
+        elif self.sub_type == OrdinaryPlateSubType.TRAILER:
+            sequence = sequence[:-1] + '挂'
+        elif self.sub_type == OrdinaryPlateSubType.COACH:
+            sequence = '学' + sequence[1:]
         
         # 生成完整车牌信息
         return self.get_plate_info(province, regional_code, sequence)
