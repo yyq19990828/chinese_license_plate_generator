@@ -84,7 +84,7 @@ class SpecialPlateRule(BaseRule):
             self.background_color = PlateColor.BLACK
             self.font_color = "white"
             self.special_chars = ["使"]
-            self.red_chars = ["使"]
+            self.red_chars = []  # 使字符为白色，不是红色
             self.is_double_layer = False
             self.sequence_length = 6
             
@@ -93,9 +93,9 @@ class SpecialPlateRule(BaseRule):
             self.background_color = PlateColor.BLACK
             self.font_color = "white"
             self.special_chars = ["领"]
-            self.red_chars = ["领"]
+            self.red_chars = []  # 领字符为白色，不是红色
             self.is_double_layer = False
-            self.sequence_length = 6
+            self.sequence_length = 5  # 5位数字序号
             
         elif self.sub_type == SpecialPlateSubType.HONG_KONG_MACAO:
             self.plate_type = PlateType.HONG_KONG_MACAO
@@ -153,7 +153,7 @@ class SpecialPlateRule(BaseRule):
     def _generate_embassy_sequence(self, embassy_type: Optional[str] = None) -> str:
         """
         生成使馆汽车号牌序号
-        格式：使 + 国家代码 + 序号
+        格式：国家代码 + 序号 (最终车牌号为：国家代码·序号使)
         
         Args:
             embassy_type: 使馆类型
@@ -173,7 +173,7 @@ class SpecialPlateRule(BaseRule):
     def _generate_consulate_sequence(self, consulate_type: Optional[str] = None) -> str:
         """
         生成领馆汽车号牌序号
-        格式：领 + 国家代码 + 序号
+        格式：5位数字 (最终车牌号为：省份+5位数字+领，总共7位)
         
         Args:
             consulate_type: 领馆类型
@@ -181,14 +181,10 @@ class SpecialPlateRule(BaseRule):
         Returns:
             str: 生成的序号
         """
-        # 领馆车牌通常使用3位数字序号
-        sequence_digits = "".join([str(random.randint(0, 9)) for _ in range(3)])
+        # 领馆车牌：5位数字序号
+        sequence_digits = "".join([str(random.randint(0, 9)) for _ in range(5)])
         
-        # 可能的国家代码（示例）
-        country_codes = ["001", "002", "003", "004", "005"]  # 实际应该是真实的国家代码
-        country_code = random.choice(country_codes)
-        
-        return f"{country_code}{sequence_digits}"
+        return sequence_digits
     
     def _generate_hong_kong_macao_sequence(self, region_type: Optional[str] = None) -> str:
         """
@@ -301,11 +297,11 @@ class SpecialPlateRule(BaseRule):
     
     def _validate_consulate_sequence(self, sequence: str) -> ValidationResult:
         """验证领馆车牌序号"""
-        # 领馆车牌：国家代码（3位数字）+ 序号（3位数字）
-        if len(sequence) != 6:
+        # 领馆车牌：5位数字序号
+        if len(sequence) != 5:
             return ValidationResult(
                 is_valid=False,
-                error_message="领馆车牌序号必须为6位"
+                error_message="领馆车牌序号必须为5位"
             )
         
         if not sequence.isdigit():
@@ -398,13 +394,19 @@ class SpecialPlateRule(BaseRule):
         plate_number = ""
 
         # 根据特殊车牌类型处理省份、地区代号和车牌号
-        if self.sub_type in [SpecialPlateSubType.EMBASSY, SpecialPlateSubType.CONSULATE]:
-            if self.sub_type == SpecialPlateSubType.EMBASSY:
-                province = "使"
-            else:
-                province = "领"
+        if self.sub_type == SpecialPlateSubType.EMBASSY:
+            # 使馆车牌格式：编号·序号使 (无省份简称)
+            province = ""
             regional_code = ""
-            plate_number = f"{province}{sequence}"
+            plate_number = f"{sequence}使"
+        elif self.sub_type == SpecialPlateSubType.CONSULATE:
+            # 领馆车牌格式：省份+编号·序号领
+            # 随机选择一个省份简称
+            province_codes = ["京", "津", "沪", "渝", "冀", "豫", "云", "辽", "黑", "湘", "皖", "鲁", "新", "苏", "浙", "赣", "鄂", "桂", "甘", "晋", "蒙", "陕", "吉", "闽", "贵", "粤", "青", "藏", "川", "宁", "琼"]
+            import random
+            province = random.choice(province_codes)
+            regional_code = ""
+            plate_number = f"{province}{sequence}领"
                 
         elif self.sub_type == SpecialPlateSubType.HONG_KONG_MACAO:
             province = "粤"

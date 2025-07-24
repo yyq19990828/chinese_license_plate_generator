@@ -38,9 +38,9 @@ class TestSpecialPlateRule:
         assert rule.background_color == PlateColor.BLACK
         assert rule.font_color == "white"
         assert rule.special_chars == ["使"]
-        assert rule.red_chars == ["使"]
+        assert rule.red_chars == []  # 使字符为白色，不是红色
         assert rule.is_double_layer == False
-        assert rule.sequence_length == 5
+        assert rule.sequence_length == 6
     
     def test_init_consulate(self):
         """测试领馆车牌规则初始化"""
@@ -51,7 +51,7 @@ class TestSpecialPlateRule:
         assert rule.background_color == PlateColor.BLACK
         assert rule.font_color == "white"
         assert rule.special_chars == ["领"]
-        assert rule.red_chars == ["领"]
+        assert rule.red_chars == []  # 领字符为白色，不是红色
         assert rule.is_double_layer == False
     
     def test_init_hong_kong_macao(self):
@@ -241,7 +241,7 @@ class TestSpecialPlateRule:
         """测试序号长度验证"""
         result = self.embassy_rule.validate_sequence("1234")
         assert result.is_valid == False
-        assert "长度必须为5位" in result.error_message
+        assert "长度必须为6位" in result.error_message
     
     def test_validate_sequence_forbidden_letters(self):
         """测试禁用字母验证"""
@@ -252,46 +252,44 @@ class TestSpecialPlateRule:
     def test_get_plate_info_embassy(self):
         """测试获取使馆车牌信息"""
         with patch.object(self.embassy_rule, 'validate_sequence', return_value=ValidationResult(is_valid=True)):
-            # 使馆车牌需要调整序号长度
-            self.embassy_rule.sequence_length = 6
-            plate_info = self.embassy_rule.get_plate_info("使", "使", "001123")
+            plate_info = self.embassy_rule.get_plate_info("使", "", "001123")
             
-            assert plate_info.plate_number == "使使001123"
+            assert plate_info.plate_number == "使001123"
             assert plate_info.plate_type == PlateType.EMBASSY
             assert plate_info.province == "使"
-            assert plate_info.regional_code == "使"
+            assert plate_info.regional_code == ""
             assert plate_info.sequence == "001123"
             assert plate_info.background_color == PlateColor.BLACK
             assert plate_info.special_chars == ["使"]
-            assert plate_info.red_chars == ["使"]
+            assert plate_info.red_chars == []
     
     def test_get_plate_info_hong_kong_macao_hong_kong(self):
         """测试获取港车车牌信息"""
         with patch.object(self.hong_kong_macao_rule, 'validate_sequence', return_value=ValidationResult(is_valid=True)):
-            plate_info = self.hong_kong_macao_rule.get_plate_info("港", "港", "A1234", "hong_kong")
+            plate_info = self.hong_kong_macao_rule.get_plate_info("粤", "Z", "A1234", "hong_kong")
             
-            assert plate_info.plate_number == "港港A1234"
-            assert plate_info.province == "港"
-            assert plate_info.regional_code == "港"
+            assert plate_info.plate_number == "粤ZA1234港"
+            assert plate_info.province == "粤"
+            assert plate_info.regional_code == "Z"
             assert plate_info.special_chars == ["港"]
     
     def test_get_plate_info_hong_kong_macao_macao(self):
         """测试获取澳车车牌信息"""
         with patch.object(self.hong_kong_macao_rule, 'validate_sequence', return_value=ValidationResult(is_valid=True)):
-            plate_info = self.hong_kong_macao_rule.get_plate_info("澳", "澳", "A1234", "macao")
+            plate_info = self.hong_kong_macao_rule.get_plate_info("粤", "Z", "A1234", "macao")
             
-            assert plate_info.plate_number == "澳澳A1234"
-            assert plate_info.province == "澳"
-            assert plate_info.regional_code == "澳"
+            assert plate_info.plate_number == "粤ZA1234澳"
+            assert plate_info.province == "粤"
+            assert plate_info.regional_code == "Z"
             assert plate_info.special_chars == ["澳"]
     
     def test_get_plate_info_hong_kong_macao_default(self):
         """测试获取港澳车牌信息（默认港车）"""
         with patch.object(self.hong_kong_macao_rule, 'validate_sequence', return_value=ValidationResult(is_valid=True)):
-            plate_info = self.hong_kong_macao_rule.get_plate_info("", "", "A1234")
+            plate_info = self.hong_kong_macao_rule.get_plate_info("粤", "Z", "A1234")
             
-            assert plate_info.province == "港"
-            assert plate_info.regional_code == "港"
+            assert plate_info.province == "粤"
+            assert plate_info.regional_code == "Z"
             assert plate_info.special_chars == ["港"]
     
     def test_get_plate_info_sequence_invalid(self):
@@ -332,8 +330,8 @@ class TestSpecialPlateRule:
         assert info["font_color"] == "white"
         assert info["is_double_layer"] == False
         assert info["special_chars"] == ["使"]
-        assert info["red_chars"] == ["使"]
-        assert info["sequence_length"] == 5
+        assert info["red_chars"] == []
+        assert info["sequence_length"] == 6
         assert info["allow_letters"] == True
         assert info["forbidden_letters"] == ["I", "O"]
     
@@ -429,11 +427,11 @@ class TestSpecialPlateRuleIntegration:
                 rule.sequence_length = 6
                 plate_info = rule.generate_plate()
                 
-                assert plate_info.plate_number == "使使001123"
+                assert plate_info.plate_number == "使001123"
                 assert plate_info.plate_type == PlateType.EMBASSY
                 assert plate_info.background_color == PlateColor.BLACK
                 assert plate_info.special_chars == ["使"]
-                assert plate_info.red_chars == ["使"]
+                assert plate_info.red_chars == []
     
     def test_complete_military_plate_generation_workflow(self):
         """测试完整的军队车牌生成流程"""
@@ -458,8 +456,11 @@ class TestSpecialPlateRuleIntegration:
             assert isinstance(rule, SpecialPlateRule)
             assert rule.sub_type == sub_type
             
-            # 验证基本属性设置正确
-            assert rule.sequence_length == 5
+            # 验证基本属性设置正确 (使馆和领馆车牌为6位，港澳和军队为5位)
+            if sub_type in [SpecialPlateSubType.EMBASSY, SpecialPlateSubType.CONSULATE]:
+                assert rule.sequence_length == 6
+            else:
+                assert rule.sequence_length == 5
             assert rule.allow_letters == True
             assert rule.forbidden_letters == ["I", "O"]
     

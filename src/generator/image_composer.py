@@ -116,9 +116,14 @@ class ImageComposer:
                     char_img = self._apply_character_enhancement(char_img)
                 
                 # 合成到背景上
+                # 处理背景颜色类型（可能是PlateColor枚举或字符串）
+                bg_color_str = (plate_info.background_color.value 
+                               if hasattr(plate_info.background_color, 'value') 
+                               else plate_info.background_color)
+                
                 background_img = self._compose_character(
                     background_img, char_img, char_pos, 
-                    plate_info.background_color, char_pos.is_red
+                    bg_color_str, char_pos.is_red
                 )
             
             # 最终后处理
@@ -300,14 +305,16 @@ class ImageComposer:
         if '警' in plate_number:
             return 1
         elif '使' in plate_number:
-            return 4
+            return 3  # 使馆车牌在第3位后分隔
+        elif '领' in plate_number:
+            return 4  # 领馆车牌在第4位后分隔
         else:
             return 2  # 默认第2位后分隔
     
     def _is_red_character(self, char: str, position: int, plate_info: PlateInfo) -> bool:
         """判断字符是否为红色"""
-        # 特殊字符 ‘警’, ‘使’, ‘领’ 总是红色
-        if char in ['警', '使', '领']:
+        # 只有特殊字符 '警' 是红色，'使'和'领'为白色
+        if char == '警':
             return True
 
         # 仅当车牌类型为军牌时，才应用其他红色字符规则
@@ -323,8 +330,21 @@ class ImageComposer:
     
     def _get_background_path(self, plate_info: PlateInfo, width: int, height: int) -> str:
         """获取背景图片路径"""
-        bg_color = plate_info.background_color
-        filename = f"{bg_color}_{height}.PNG"
+        plate_number = plate_info.plate_number
+        
+        # 使用专用底牌模板
+        if '使' in plate_number:
+            filename = f"black_shi_{height}.png"
+        elif '领' in plate_number:
+            filename = f"black_ling_{height}.PNG"
+        else:
+            # 使用原始逻辑 - 处理背景颜色类型
+            bg_color = plate_info.background_color
+            bg_color_str = (bg_color.value 
+                           if hasattr(bg_color, 'value') 
+                           else bg_color)
+            filename = f"{bg_color_str}_{height}.PNG"
+        
         return os.path.join(self.plate_models_dir, filename)
     
     def _get_font_prefix(self, plate_info: PlateInfo) -> str:
