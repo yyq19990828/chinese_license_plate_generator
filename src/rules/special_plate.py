@@ -4,7 +4,7 @@
 包括：使馆汽车号牌、领馆汽车号牌、港澳入出境车号牌、军队车牌
 """
 
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 from enum import Enum
 import random
 
@@ -394,34 +394,38 @@ class SpecialPlateRule(BaseRule):
         if not sequence_result.is_valid:
             raise PlateGenerationError(sequence_result.error_message)
         
-        # 根据特殊车牌类型处理省份和地区代号
+        special_chars = list(self.special_chars)  # 创建副本以避免副作用
+        plate_number = ""
+
+        # 根据特殊车牌类型处理省份、地区代号和车牌号
         if self.sub_type in [SpecialPlateSubType.EMBASSY, SpecialPlateSubType.CONSULATE]:
-            # 使馆、领馆车牌的省份和地区代码实际上就是特殊字符本身
             if self.sub_type == SpecialPlateSubType.EMBASSY:
                 province = "使"
             else:
                 province = "领"
-            regional_code = ""  # 地区代码为空
+            regional_code = ""
+            plate_number = f"{province}{sequence}"
                 
         elif self.sub_type == SpecialPlateSubType.HONG_KONG_MACAO:
-            # 港澳车牌
-            if special_type == "hong_kong":
-                province = "粤"
-                regional_code = "Z"
-                self.special_chars = ["港"]
-            elif special_type == "macao":
-                province = "粤"
-                regional_code = "Z"
-                self.special_chars = ["澳"]
-            else:
-                # 默认为港牌
-                province = "粤"
-                regional_code = "Z"
-                self.special_chars = ["港"]
+            province = "粤"
+            regional_code = "Z"
+            if special_type == "macao":
+                special_chars = ["澳"]
+            else: # 默认为港牌
+                special_chars = ["港"]
+            plate_number = f"{province}{regional_code}{sequence}{special_chars[0]}"
         
-        # 构造完整车牌号码
-        plate_number = self.format_plate_number(province, regional_code, sequence)
+        elif self.sub_type == SpecialPlateSubType.MILITARY:
+            # 对于军队车牌, plate_number 就是完整的序号
+            plate_number = sequence
+            # Reason: 军队车牌的省份和地区代码是其序号的一部分, 此处进行修正
+            prov = sequence[0]
+            reg_code = ""
         
+        # 如果有未处理的类型, 使用基类格式
+        if not plate_number:
+            plate_number = super().format_plate_number(province, regional_code, sequence)
+
         # 创建车牌信息对象
         plate_info = PlateInfo(
             plate_number=plate_number,
@@ -431,7 +435,7 @@ class SpecialPlateRule(BaseRule):
             sequence=sequence,
             background_color=self.background_color,
             is_double_layer=self.is_double_layer,
-            special_chars=self.special_chars,
+            special_chars=special_chars,
             font_color=self.font_color,
             red_chars=self.red_chars
         )
@@ -471,16 +475,15 @@ class SpecialPlateRule(BaseRule):
         """
         # 军牌需要特殊处理，因为它不使用传统的省份和地区代码
         if self.sub_type == SpecialPlateSubType.MILITARY:
-            # 1. 生成完整的军牌号码（例如 "WJ1234"）
-            full_sequence = self.generate_sequence(province, regional_code, special_type, **kwargs)
+            # 1. 生成完整的5位军牌序号（例如 "A1234"）
+            sequence = self.generate_sequence(province, regional_code, special_type, **kwargs)
             
             # 2. 解析军牌结构
-            prov = full_sequence[0]  # 省份/军种
-            reg_code = full_sequence[1] # 地区代码
-            seq = full_sequence[2:]   # 序号
+            prov = sequence[0]  # 省份/军种
+            reg_code = ""  # 军队车牌没有传统意义上的地区代码
             
-            # 3. 直接使用解析后的结构创建 PlateInfo
-            return self.get_plate_info(prov, reg_code, seq, special_type)
+            # 3. 直接使用完整的5位序号创建 PlateInfo
+            return self.get_plate_info(prov, reg_code, sequence, special_type)
 
         # 其他特殊车牌（使、领、港澳）的逻辑
         sequence = self.generate_sequence(
@@ -539,7 +542,7 @@ class SpecialPlateRuleFactory:
     """
     
     @staticmethod
-    def create_rule(sub_type: [str, SpecialPlateSubType]) -> "SpecialPlateRule":
+    def create_rule(sub_type: Union[str, SpecialPlateSubType]) -> "SpecialPlateRule":
         """
         创建特殊车牌规则
         

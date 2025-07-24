@@ -12,8 +12,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def parse_args():
     parser = argparse.ArgumentParser(description='中国车牌生成器 (重构版)')
-    parser.add_argument('--number', default=100, type=int, help='生成车牌数量')
-    parser.add_argument('--save-adr', default='multi_val', help='车牌图像保存路径')
+    parser.add_argument('--number', default=1000, type=int, help='生成车牌数量')
+    parser.add_argument('--save-adr', default='output_multi', help='车牌图像保存路径')
     args = parser.parse_args()
     return args
 
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     for i in tqdm(range(args.number), desc="正在生成车牌"):
         try:
             # 生成车牌信息和图像
-            plate_info, plate_image = generator.generate_plate_with_image()
+            plate_info, plate_image = generator.generate_plate_with_image(enhance=True)
             
             # 保存图像
             filename = f"{plate_info.plate_number}_{plate_info.background_color}_{plate_info.is_double_layer}.jpg"
