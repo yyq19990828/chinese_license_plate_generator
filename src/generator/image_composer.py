@@ -11,11 +11,14 @@ import cv2
 import os
 from dataclasses import dataclass
 import logging
+from PIL import Image
 
 from .plate_generator import PlateInfo
 from ..rules.base_rule import PlateColor
 from ..utils.constants import PlateType
 from ..core.exceptions import PlateGenerationError
+from ..transform.composite_transform import CompositeTransform
+from ..transform.transform_config import TransformConfig, default_config
 
 
 
@@ -48,21 +51,31 @@ class ImageComposer:
     2. 字符颜色的自动判断
     3. 双层车牌的支持
     4. 图像增强和后处理
+    
+    Args:
+        plate_models_dir: 车牌底板资源目录
+        font_models_dir: 字体资源目录
+        transform_config: 变换配置，如果为None则使用默认配置
     """
     
-    def __init__(self, plate_models_dir: str, font_models_dir: str):
+    def __init__(self, plate_models_dir: str, font_models_dir: str, 
+                 transform_config: Optional[TransformConfig] = None):
         """
         初始化图像合成器
         
         Args:
             plate_models_dir: 车牌底板资源目录
             font_models_dir: 字体资源目录
+            transform_config: 变换配置，如果为None则使用默认配置
         """
         self.plate_models_dir = plate_models_dir
         self.font_models_dir = font_models_dir
         
         # 预定义的车牌尺寸和布局参数
         self.layout_configs = self._initialize_layout_configs()
+        
+        # 初始化变换管理器
+        self.transform_manager = CompositeTransform(transform_config or default_config)
         
     def compose_plate_image(self, plate_info: PlateInfo, enhance: bool = False) -> np.ndarray:
         """
@@ -110,6 +123,10 @@ class ImageComposer:
             
             # 最终后处理
             final_img = self._apply_final_processing(background_img)
+            
+            # 应用变换效果（如果启用增强）
+            if enhance:
+                final_img = self._apply_transform_effects(final_img)
             
             logging.info(f"车牌图像合成成功: {plate_info.plate_number}")
             return final_img
@@ -379,6 +396,37 @@ class ImageComposer:
             return cv2.erode(char_img, kernel, iterations=1)
         else:
             return cv2.dilate(char_img, kernel, iterations=1)
+    
+    def _apply_transform_effects(self, image: np.ndarray) -> np.ndarray:
+        """
+        应用变换效果到最终图像
+        
+        Args:
+            image: 输入图像(numpy array)
+            
+        Returns:
+            np.ndarray: 应用变换后的图像
+        """
+        try:
+            # 转换为PIL图像格式
+            pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            
+            # 应用复合变换
+            transformed_image, applied_transforms = self.transform_manager.apply(pil_image)
+            
+            # 转换回numpy格式
+            result_image = cv2.cvtColor(np.array(transformed_image), cv2.COLOR_RGB2BGR)
+            
+            if applied_transforms:
+                logging.info(f"应用的变换效果: {', '.join(applied_transforms)}")
+            else:
+                logging.info("未应用任何变换效果")
+                
+            return result_image
+            
+        except Exception as e:
+            logging.warning(f"变换效果应用失败，返回原始图像: {str(e)}")
+            return image
     
     def _compose_character(self, background: np.ndarray, char_img: np.ndarray, 
                           position: CharacterPosition, bg_color: str, is_red: bool) -> np.ndarray:

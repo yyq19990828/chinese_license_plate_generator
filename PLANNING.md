@@ -27,6 +27,14 @@ src/
 │   ├── plate_generator.py # 主生成器
 │   ├── image_composer.py  # 图像合成器
 │   └── font_manager.py    # 字体管理器
+├── transform/             # 车牌增强变换模块
+│   ├── __init__.py
+│   ├── base_transform.py  # 基础变换类和接口
+│   ├── aging_effects.py   # 车牌老化效果(磨损、褪色等)
+│   ├── perspective_transform.py # 透视和角度变换
+│   ├── lighting_effects.py # 光照条件模拟(阴影、反光、夜间等)
+│   ├── composite_transform.py # 复合变换管理器
+│   └── transform_config.py # 变换配置和概率管理
 ├── validators/            # 验证器模块
 │   ├── __init__.py
 │   ├── plate_validator.py # 车牌号码验证器
@@ -43,6 +51,7 @@ src/
 tests/                     # 测试模块
 ├── test_rules/
 ├── test_generator/
+├── test_transform/
 ├── test_validators/
 └── fixtures/
 
@@ -64,7 +73,15 @@ plate_model/               # 车牌底板资源(保持现有)
 - **ImageComposer**: 负责车牌图像合成
 - **FontManager**: 管理字体资源和渲染
 
-#### 2.2.3. 验证系统 (validators/)
+#### 2.2.3. 车牌增强变换系统 (transform/)
+- **BaseTransform**: 所有变换效果的基类，定义统一接口
+- **AgingEffects**: 车牌老化效果（磨损、褪色、污渍等）
+- **PerspectiveTransform**: 透视和角度变换（倾斜、旋转、透视等）
+- **LightingEffects**: 光照条件模拟（阴影、反光、夜间、背光等）
+- **CompositeTransform**: 复合变换管理器，支持多种效果组合
+- **TransformConfig**: 变换配置和概率管理，默认概率0.3
+
+#### 2.2.4. 验证系统 (validators/)
 - **PlateValidator**: 验证生成的车牌号码是否符合规则
 - **RuleValidator**: 验证规则配置的正确性
 

@@ -2,6 +2,17 @@
 .mcp.json
 PRPs/
 .serena/
+**/*.jpg
+**/*.jpeg
+**/*.png
+**/*.gif
+**/*.bmp
+**/*.tiff
+**/*.webp
+**/*.svg
+**/*.ico
+out*/
+demo*/
 
 # Python
 __pycache__/

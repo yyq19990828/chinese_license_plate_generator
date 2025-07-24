@@ -79,21 +79,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Architecture
 
-This repository is a PyTorch implementation of the RT-DETRv3 object detection model.
+This repository is a Chinese license plate generator.
 
 *   `src/`: Contains the core source code.
-    *   `src/nn/`: The core neural network building blocks.
-        *   `backbone/`: CNN backbones (e.g., ResNet).
-        *   `neck/`: Feature pyramid network (Hybrid Encoder).
-        *   `head/`: The detection head (RT-DETR Head).
-        *   `transformer/`: The transformer implementation for the model.
-    *   `src/solver/`: Handles the training and evaluation logic (`trainer.py`, `evaluator.py`).
-    *   `src/data/`: Includes the dataset loaders, augmentations, and data processing pipelines.
-    *   `src/core/`: Core utilities for managing configuration (`config.py`) and workspace.
-    *   `src/zoo/`: Contains the complete model definitions, bringing all the `nn` components together (e.g., `rtdetrv3.py`).
-*   `tools/`: High-level scripts that act as user-facing entry points for training, evaluation, inference, and exporting.
-*   `configs/`: YAML configuration files that define model architecture, training schedules, and dataset parameters.
-*   `tests/`: Contains unit and integration tests for the various components of the model.
+    *   `src/core/`: Core utilities for managing configuration (`config.py`) and custom exceptions (`exceptions.py`).
+    *   `src/generator/`: Handles the image generation process.
+        *   `font_manager.py`: Manages loading and applying fonts.
+        *   `image_composer.py`: Composes the final license plate image from templates and characters.
+        *   `plate_generator.py`: Generates the characters and structure for a given plate number.
+        *   `integrated_generator.py`: Integrates the rules and generation process.
+    *   `src/rules/`: Defines the rules for generating different types of license plates.
+        *   `province_codes.py`: Contains mappings for province abbreviations.
+        *   `regional_codes.py`: Manages city/regional codes.
+        *   `sequence_generator.py`: Generates the alphanumeric sequence for the plate.
+        *   `ordinary_plate.py`, `new_energy_plate.py`, `special_plate.py`: Define rules for specific plate types.
+    *   `src/validators/`: Contains validation logic for generated plates and rules.
+    *   `src/utils/`: Shared utilities and constants.
+*   Root scripts (`generate_by_province.py`, etc.): High-level scripts that act as user-facing entry points for generating plates.
+*   `font_model/`: Contains font files used for rendering characters on the plates.
+*   `plate_model/`: Contains template images for different types of license plates.
+*   `province_output/`: Default output directory for generated license plates, organized by province.
+*   `tests/`: Contains unit and integration tests for the various components.
 
 ## Memories
 

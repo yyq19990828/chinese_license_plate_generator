@@ -12,6 +12,7 @@ from .plate_generator import PlateGenerator, PlateInfo, PlateGenerationConfig
 from .image_composer import ImageComposer  
 from .font_manager import FontManager
 from ..core.exceptions import PlateGenerationError
+from ..transform.transform_config import TransformConfig
 
 
 class IntegratedPlateGenerator:
@@ -19,11 +20,18 @@ class IntegratedPlateGenerator:
     集成车牌生成器
     
     整合了号码生成、图像合成和字体管理的完整解决方案。
+    
+    Args:
+        plate_models_dir: 车牌底板资源目录
+        font_models_dir: 字体资源目录  
+        enable_font_cache: 是否启用字体缓存
+        transform_config: 变换配置，如果为None则使用默认配置
     """
     
     def __init__(self, plate_models_dir: str = "plate_model", 
                  font_models_dir: str = "font_model", 
-                 enable_font_cache: bool = True):
+                 enable_font_cache: bool = True,
+                 transform_config: Optional[TransformConfig] = None):
         """
         初始化集成生成器
         
@@ -31,10 +39,11 @@ class IntegratedPlateGenerator:
             plate_models_dir: 车牌底板资源目录
             font_models_dir: 字体资源目录  
             enable_font_cache: 是否启用字体缓存
+            transform_config: 变换配置，如果为None则使用默认配置
         """
         # 初始化各个组件
         self.plate_generator = PlateGenerator()
-        self.image_composer = ImageComposer(plate_models_dir, font_models_dir)
+        self.image_composer = ImageComposer(plate_models_dir, font_models_dir, transform_config)
         self.font_manager = FontManager(font_models_dir, enable_font_cache)
         
         # 验证资源完整性

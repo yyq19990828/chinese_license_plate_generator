@@ -20,7 +20,12 @@ from ..core.exceptions import PlateGenerationError
 
 
 class FontCache:
-    """字体缓存类"""
+    """
+    字体缓存类
+    
+    Args:
+        max_size: 最大缓存大小
+    """
     
     def __init__(self, max_size: int = 1000):
         """
@@ -81,6 +86,11 @@ class FontManager:
     字体管理器
     
     负责车牌字体资源的管理和优化。
+    
+    Args:
+        font_dir: 字体资源目录
+        enable_cache: 是否启用缓存
+        cache_size: 缓存大小
     """
     
     def __init__(self, font_dir: str, enable_cache: bool = True, cache_size: int = 1000):
