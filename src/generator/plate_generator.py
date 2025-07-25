@@ -100,7 +100,7 @@ class PlateGenerator:
             if plate_type in [PlateType.ORDINARY_BLUE, PlateType.ORDINARY_YELLOW, 
                              PlateType.POLICE_WHITE, PlateType.ORDINARY_COACH, PlateType.ORDINARY_TRAILER]:
                 return self._generate_ordinary_plate(plate_type, config)
-            elif plate_type == PlateType.NEW_ENERGY_GREEN:
+            elif plate_type in [PlateType.NEW_ENERGY_GREEN, PlateType.NEW_ENERGY_SMALL, PlateType.NEW_ENERGY_LARGE]:
                 return self._generate_new_energy_plate(config)
             elif plate_type in [PlateType.EMBASSY_BLACK, PlateType.MILITARY_WHITE, 
                                PlateType.HONGKONG_BLACK, PlateType.MACAO_BLACK]:
@@ -140,6 +140,9 @@ class PlateGenerator:
             # 检测特殊字符
             special_chars = self._detect_special_chars(plate_number)
             
+            # 确定分隔位置
+            split_pos = self._determine_split_position(plate_type, plate_number)
+            
             return PlateInfo(
                 plate_number=plate_number,
                 plate_type=plate_type,
@@ -148,6 +151,7 @@ class PlateGenerator:
                 sequence=sequence,
                 background_color=bg_color,
                 is_double_layer=is_double,
+                split_position=split_pos,
                 special_chars=special_chars
             )
             
@@ -236,6 +240,7 @@ class PlateGenerator:
         # 获取样式信息
         bg_color, is_double = self._get_plate_style(plate_type, plate_number)
         special_chars = self._detect_special_chars(plate_number)
+        split_pos = self._determine_split_position(plate_type, plate_number)
         
         return PlateInfo(
             plate_number=plate_number,
@@ -245,6 +250,7 @@ class PlateGenerator:
             sequence=sequence,
             background_color=bg_color,
             is_double_layer=is_double,
+            split_position=split_pos,
             special_chars=special_chars
         )
     
@@ -283,22 +289,8 @@ class PlateGenerator:
             
             plate_info = rule.generate_plate(province, regional_code)
         
-        # 从生成的PlateInfo中提取号码
-        plate_number = plate_info.plate_number
-        
-        # 解析号码组成
-        province, regional_code, sequence = self._parse_plate_number(plate_number)
-        
-        return PlateInfo(
-            plate_number=plate_number,
-            plate_type=PlateType.NEW_ENERGY_GREEN,
-            province=province,
-            regional_code=regional_code,
-            sequence=sequence,
-            background_color="green_car",
-            is_double_layer=False,
-            special_chars=None
-        )
+        # 直接返回rule生成的PlateInfo，它已经包含了正确的类型和背景颜色
+        return plate_info
     
     def _generate_special_plate(self, plate_type: str, config: PlateGenerationConfig) -> PlateInfo:
         """生成特殊车牌"""
@@ -346,6 +338,7 @@ class PlateGenerator:
         # 获取样式信息
         bg_color, is_double = self._get_plate_style(plate_type, plate_number)
         special_chars = self._detect_special_chars(plate_number)
+        split_pos = self._determine_split_position(plate_type, plate_number)
         
         return PlateInfo(
             plate_number=plate_number,
@@ -355,6 +348,7 @@ class PlateGenerator:
             sequence=sequence,
             background_color=bg_color,
             is_double_layer=is_double,
+            split_position=split_pos,
             special_chars=special_chars
         )
     
@@ -432,3 +426,34 @@ class PlateGenerator:
                 special_chars.append(char)
         
         return special_chars if special_chars else None
+    
+    def _determine_split_position(self, plate_type: str, plate_number: str) -> int:
+        """
+        确定车牌分隔符位置
+        
+        Args:
+            plate_type: 车牌类型
+            plate_number: 车牌号码
+            
+        Returns:
+            int: 分隔符位置（第几位后分隔）
+        """
+        # 特殊字符分隔位置映射
+        SPECIAL_CHAR_SPLIT_MAP = {
+            '使': 3,  # 使馆车牌: 省12·3456使
+            '领': 4,  # 领馆车牌: 省123·45领  
+            '港': 2,  # 港澳车牌: 粤Z·1234港
+            '澳': 2,  # 港澳车牌: 粤Z·1234澳
+        }
+        
+        # 检查特殊字符
+        for char, position in SPECIAL_CHAR_SPLIT_MAP.items():
+            if char in plate_number:
+                return position
+                
+        # 特殊车牌类型
+        if plate_type == PlateType.MILITARY_WHITE:
+            return 2  # 军队车牌: AB·1234
+            
+        # 默认分隔位置
+        return 2

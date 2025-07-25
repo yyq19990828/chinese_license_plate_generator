@@ -157,7 +157,7 @@ class ImageComposer:
             "single_8": {  # 8位单层车牌(新能源)
                 "width": 480,
                 "height": 140,
-                "char_width": 43,
+                "char_width": 45,  # 新能源车牌首字符标准宽度为45像素
                 "char_height": 90,
                 "y_offset": 25,
                 "split_gap": 49,

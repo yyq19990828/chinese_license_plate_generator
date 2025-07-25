@@ -65,9 +65,9 @@ class NewEnergyPlateRule(BaseRule):
             
         elif self.sub_type == NewEnergyPlateSubType.LARGE_CAR:
             self.plate_type = PlateType.NEW_ENERGY_LARGE
-            self.background_color = PlateColor.YELLOW_GREEN  # 大型新能源车：黄绿双拼底
+            self.background_color = PlateColor.GREEN_YELLOW  # 大型新能源车：黄绿双拼底
             self.font_color = "black"
-            self.is_double_layer = True  # 大型新能源汽车号牌为双层
+            self.is_double_layer = False  # 新能源车牌目前只有单层设计
     
     def generate_sequence(self, 
                          province: str, 
@@ -225,6 +225,9 @@ class NewEnergyPlateRule(BaseRule):
         # 构造完整车牌号码
         plate_number = self.format_plate_number(province, regional_code, sequence)
         
+        # 确定分隔位置 - 新能源车牌通常在第2位后分隔
+        split_pos = 2
+        
         # 创建车牌信息对象
         plate_info = PlateInfo(
             plate_number=plate_number,
@@ -234,6 +237,7 @@ class NewEnergyPlateRule(BaseRule):
             sequence=sequence,
             background_color=self.background_color,
             is_double_layer=self.is_double_layer,
+            split_position=split_pos,
             special_chars=None,  # 新能源车牌无特殊字符
             font_color=self.font_color,
             red_chars=None  # 新能源车牌无红色字符
@@ -444,7 +448,7 @@ class NewEnergyPlateRuleFactory:
     """
     
     @staticmethod
-    def create_rule(sub_type: [str, NewEnergyPlateSubType]) -> "NewEnergyPlateRule":
+    def create_rule(sub_type: str | NewEnergyPlateSubType) -> "NewEnergyPlateRule":
         """
         创建新能源汽车号牌规则
         

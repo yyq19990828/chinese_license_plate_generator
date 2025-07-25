@@ -253,7 +253,9 @@ class PlateType:
     MILITARY_WHITE = "military_white"         # 军队车牌
     
     # 新能源汽车号牌
-    NEW_ENERGY_GREEN = "new_energy_green"     # 新能源汽车绿牌
+    NEW_ENERGY_GREEN = "new_energy_green"     # 新能源汽车绿牌（兼容性）
+    NEW_ENERGY_SMALL = "new_energy_small"     # 小型新能源汽车绿牌
+    NEW_ENERGY_LARGE = "new_energy_large"     # 大型新能源汽车绿牌
     
     # 特殊用途号牌
     EMBASSY_BLACK = "embassy_black"           # 使领馆黑牌

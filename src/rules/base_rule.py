@@ -30,8 +30,8 @@ class PlateColor(Enum):
     YELLOW = "yellow"  # 黄底黑字
     WHITE = "white"  # 白底黑字
     BLACK = "black"  # 黑底白字
-    GREEN = "green"  # 渐变绿底黑字
-    YELLOW_GREEN = "yellow_green"  # 黄绿双拼底黑字
+    GREEN = "green"  # 小型新能源车：渐变绿底黑字
+    GREEN_YELLOW = "green_yellow"  # 大型新能源车：黄绿双拼底黑字
 
 
 class PlateInfo(BaseModel):

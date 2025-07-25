@@ -50,9 +50,9 @@ class TestNewEnergyPlateRule:
         
         assert rule.sub_type == NewEnergyPlateSubType.LARGE_CAR
         assert rule.plate_type == PlateType.NEW_ENERGY_LARGE
-        assert rule.background_color == PlateColor.YELLOW_GREEN
+        assert rule.background_color == PlateColor.GREEN_YELLOW
         assert rule.font_color == "black"
-        assert rule.is_double_layer == True
+        assert rule.is_double_layer == False  # 新能源车牌目前只有单层设计
         assert rule.sequence_length == 6
     
     @patch('src.rules.new_energy_plate.NewEnergySequenceGenerator')
