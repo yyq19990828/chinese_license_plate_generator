@@ -43,6 +43,7 @@ class PlateInfo(BaseModel):
     sequence: str  # 序号部分
     background_color: PlateColor  # 背景颜色
     is_double_layer: bool = False  # 是否双层车牌（如大型车）
+    split_position: int = 2  # 分隔符位置（第几位字符后分隔，默认第2位后）
     special_chars: Optional[List[str]] = None  # 特殊字符（如"警"、"使"、"领"等）
     font_color: str = "black"  # 字体颜色（通常是黑或白）
     red_chars: Optional[List[str]] = None  # 红色字符列表（如"警"等）

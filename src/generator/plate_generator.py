@@ -27,6 +27,7 @@ class PlateInfo(BaseModel):
     sequence: str
     background_color: str
     is_double_layer: bool
+    split_position: int  # 分隔符位置（第几位字符后分隔）
     special_chars: Optional[List[str]] = None
     
     

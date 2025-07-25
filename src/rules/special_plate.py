@@ -452,6 +452,18 @@ class SpecialPlateRule(BaseRule):
         if not plate_number:
             plate_number = super().format_plate_number(province, regional_code, sequence)
 
+        # 确定分隔位置
+        if self.sub_type == SpecialPlateSubType.EMBASSY:
+            split_pos = 3  # 使馆车牌在第3位后分隔 (123·456使)
+        elif self.sub_type == SpecialPlateSubType.CONSULATE:
+            split_pos = 4  # 领馆车牌在第4位后分隔 (省123·45领)
+        elif self.sub_type == SpecialPlateSubType.HONG_KONG_MACAO:
+            split_pos = 2  # 港澳车牌在第2位后分隔 (粤Z·1234港)
+        elif self.sub_type == SpecialPlateSubType.MILITARY:
+            split_pos = 2  # 军队车牌在第2位后分隔 (AB·1234)
+        else:
+            split_pos = 2  # 默认第2位后分隔
+
         # 创建车牌信息对象
         plate_info = PlateInfo(
             plate_number=plate_number,
@@ -461,6 +473,7 @@ class SpecialPlateRule(BaseRule):
             sequence=sequence,
             background_color=self.background_color,
             is_double_layer=self.is_double_layer,
+            split_position=split_pos,
             special_chars=special_chars,
             font_color=self.font_color,
             red_chars=self.red_chars

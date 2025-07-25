@@ -299,17 +299,8 @@ class ImageComposer:
     
     def _get_split_position(self, plate_info: PlateInfo) -> int:
         """获取分隔符位置"""
-        plate_number = plate_info.plate_number
-        
-        # 根据特殊字符确定分隔位置
-        if '警' in plate_number:
-            return 1
-        elif '使' in plate_number:
-            return 3  # 使馆车牌在第3位后分隔
-        elif '领' in plate_number:
-            return 4  # 领馆车牌在第4位后分隔
-        else:
-            return 2  # 默认第2位后分隔
+        # 直接使用 PlateInfo 中的 split_position 属性
+        return plate_info.split_position
     
     def _is_red_character(self, char: str, position: int, plate_info: PlateInfo) -> bool:
         """判断字符是否为红色"""
