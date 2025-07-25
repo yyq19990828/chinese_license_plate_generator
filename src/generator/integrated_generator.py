@@ -7,6 +7,7 @@
 from typing import Optional, List, Tuple
 import numpy as np
 import os
+import logging
 
 from .plate_generator import PlateGenerator, PlateInfo, PlateGenerationConfig
 from .image_composer import ImageComposer  
@@ -62,15 +63,20 @@ class IntegratedPlateGenerator:
             Tuple[PlateInfo, np.ndarray]: 车牌信息和图像
         """
         try:
+            logging.debug("开始生成车牌信息...")
             # 生成车牌信息
             plate_info = self.plate_generator.generate_random_plate(config)
+            logging.debug(f"生成车牌信息: {plate_info.plate_number} ({plate_info.plate_type}, {plate_info.background_color})")
             
+            logging.debug("开始合成车牌图像...")
             # 生成车牌图像
             plate_image = self.image_composer.compose_plate_image(plate_info, enhance)
+            logging.debug(f"车牌图像合成完成，尺寸: {plate_image.shape}")
             
             return plate_info, plate_image
             
         except Exception as e:
+            logging.error(f"车牌生成失败: {str(e)}")
             raise PlateGenerationError(f"集成生成失败: {str(e)}")
     
     def generate_specific_plate_with_image(self, plate_number: str, 

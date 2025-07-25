@@ -91,12 +91,12 @@ class ImageComposer:
         Raises:
             PlateGenerationError: 合成失败时抛出
         """
-        logging.info(f"开始合成车牌图像: {plate_info.plate_number}, 类型: {plate_info.plate_type}, 背景: {plate_info.background_color}")
+        logging.debug(f"开始合成车牌图像: {plate_info.plate_number}, 类型: {plate_info.plate_type}, 背景: {plate_info.background_color}")
         try:
             # 计算布局
             layout = self._calculate_layout(plate_info)
-            logging.info(f"使用布局: 宽度={layout.width}, 高度={layout.height}, 字体前缀='{layout.font_prefix}'")
-            
+            logging.debug(f"使用布局: 宽度={layout.width}, 高度={layout.height}, 字体前缀='{layout.font_prefix}'")
+
             # 加载底板图像
             background_img = self._load_background_image(layout.background_path, layout.width, layout.height)
             

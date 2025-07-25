@@ -40,8 +40,11 @@ if __name__ == '__main__':
             # 生成车牌信息和图像
             plate_info, plate_image = generator.generate_plate_with_image(enhance=True)
             
-            # 保存图像
-            filename = f"{plate_info.plate_number}_{plate_info.background_color}_{plate_info.is_double_layer}.jpg"
+            # 保存图像 - 使用更清晰的命名规则
+            layer_type = "double" if plate_info.is_double_layer else "single"
+            plate_type_str = plate_info.plate_type.value if hasattr(plate_info.plate_type, 'value') else str(plate_info.plate_type)
+            bg_color_str = plate_info.background_color.value if hasattr(plate_info.background_color, 'value') else str(plate_info.background_color)
+            filename = f"{plate_info.plate_number}_{bg_color_str}_{layer_type}.jpg"
             filepath = os.path.join(args.save_adr, filename)
             cv2.imwrite(filepath, plate_image)
 
