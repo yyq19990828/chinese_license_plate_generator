@@ -334,7 +334,7 @@ class ImageComposer:
         
         # 使用专用底牌模板
         if '使' in plate_number:
-            filename = f"black_shi_{height}.png"
+            filename = f"black_shi_{height}.PNG"
         elif '领' in plate_number:
             filename = f"black_ling_{height}.PNG"
         else:

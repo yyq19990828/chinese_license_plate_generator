@@ -37,7 +37,7 @@ class OrdinaryPlateRule(BaseRule):
         """
         super().__init__()
         self.sub_type = sub_type
-        self.sequence_length = 5  # 普通汽车号牌序号长度为5位
+        self.sequence_length = 5  # NOTE 普通汽车号牌序号长度为5位
         self.allow_letters = True
         self.forbidden_letters = ["I", "O"]
         

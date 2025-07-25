@@ -18,8 +18,8 @@ class PlateType(Enum):
     POLICE = "police"  # 警用汽车号牌（白底黑字，红"警"字）
     NEW_ENERGY_SMALL = "new_energy_small"  # 小型新能源汽车号牌（渐变绿底黑字）
     NEW_ENERGY_LARGE = "new_energy_large"  # 大型新能源汽车号牌（黄绿双拼底黑字）
-    EMBASSY = "embassy"  # 使馆汽车号牌（黑底白字，红"使"字）
-    CONSULATE = "consulate"  # 领馆汽车号牌（黑底白字，红"领"字）
+    EMBASSY = "embassy"  # 使馆汽车号牌（黑底白字）
+    CONSULATE = "consulate"  # 领馆汽车号牌（黑底白字）
     HONG_KONG_MACAO = "hong_kong_macao"  # 港澳入出境车号牌（黑底白字）
     MILITARY = "military"  # 军队车牌（首位字母+红色）
 
@@ -45,7 +45,7 @@ class PlateInfo(BaseModel):
     is_double_layer: bool = False  # 是否双层车牌（如大型车）
     special_chars: Optional[List[str]] = None  # 特殊字符（如"警"、"使"、"领"等）
     font_color: str = "black"  # 字体颜色（通常是黑或白）
-    red_chars: Optional[List[str]] = None  # 红色字符列表（如"警"、"使"等）
+    red_chars: Optional[List[str]] = None  # 红色字符列表（如"警"等）
 
 
 class ValidationResult(BaseModel):
