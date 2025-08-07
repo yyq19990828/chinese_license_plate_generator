@@ -38,6 +38,7 @@ class PlateGenerationConfig(BaseModel):
     regional_code: Optional[str] = None  # 指定地区代号，None表示随机
     new_energy_type: Optional[str] = None  # 新能源车类型：electric/hybrid，None表示随机
     special_type: Optional[str] = None  # 特殊车牌类型
+    convert_double_to_single: bool = False  # 是否将双层车牌转换为单层显示
     
 
 class PlateGenerator:

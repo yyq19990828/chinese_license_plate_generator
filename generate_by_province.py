@@ -40,6 +40,10 @@ def parse_args():
                         default=0.2,
                         type=float,
                         help='生成双层车牌的比例 (0.0 到 1.0 之间)')
+    
+    parser.add_argument('--convert-double-to-single',
+                        action='store_true',
+                        help='将双层车牌转换为单层显示（上下行拼接）')
                         
     args = parser.parse_args()
     
@@ -83,7 +87,8 @@ if __name__ == '__main__':
             # 配置生成器
             config = PlateGenerationConfig(
                 province=args.province,
-                plate_type=plate_type
+                plate_type=plate_type,
+                convert_double_to_single=args.convert_double_to_single
             )
 
             # 生成车牌信息和图像

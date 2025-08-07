@@ -76,8 +76,10 @@ class IntegratedPlateGenerator:
             logging.debug("开始合成车牌图像...")
             # 创建增强配置
             enhance_config = EnhanceConfig(enhance)
+            # 检查是否需要双层转单层
+            convert_double = config and config.convert_double_to_single
             # 生成车牌图像
-            plate_image = self.image_composer.compose_plate_image(plate_info, enhance_config)
+            plate_image = self.image_composer.compose_plate_image(plate_info, enhance_config, convert_double)
             logging.debug(f"车牌图像合成完成，尺寸: {plate_image.shape}")
             
             return plate_info, plate_image
@@ -87,7 +89,8 @@ class IntegratedPlateGenerator:
             raise PlateGenerationError(f"集成生成失败: {str(e)}")
     
     def generate_specific_plate_with_image(self, plate_number: str, 
-                                         enhance: Union[bool, TransformConfig, EnhanceConfig, None] = False) -> Tuple[PlateInfo, np.ndarray]:
+                                         enhance: Union[bool, TransformConfig, EnhanceConfig, None] = False,
+                                         convert_double_to_single: bool = False) -> Tuple[PlateInfo, np.ndarray]:
         """
         生成指定号码的车牌和图像
         
@@ -98,6 +101,7 @@ class IntegratedPlateGenerator:
                 - TransformConfig: 使用自定义变换配置
                 - EnhanceConfig: 使用增强配置对象
                 - None: 禁用增强
+            convert_double_to_single: 是否将双层车牌转换为单层显示
             
         Returns:
             Tuple[PlateInfo, np.ndarray]: 车牌信息和图像
@@ -109,7 +113,7 @@ class IntegratedPlateGenerator:
             # 创建增强配置
             enhance_config = EnhanceConfig(enhance)
             # 生成车牌图像
-            plate_image = self.image_composer.compose_plate_image(plate_info, enhance_config)
+            plate_image = self.image_composer.compose_plate_image(plate_info, enhance_config, convert_double_to_single)
             
             return plate_info, plate_image
             

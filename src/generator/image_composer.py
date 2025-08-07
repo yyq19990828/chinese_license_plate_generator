@@ -78,7 +78,7 @@ class ImageComposer:
         # 初始化变换管理器
         self.transform_manager = CompositeTransform(transform_config or default_config)
         
-    def compose_plate_image(self, plate_info: PlateInfo, enhance: Union[bool, EnhanceConfig, TransformConfig] = False) -> np.ndarray:
+    def compose_plate_image(self, plate_info: PlateInfo, enhance: Union[bool, EnhanceConfig, TransformConfig] = False, convert_double_to_single: bool = False) -> np.ndarray:
         """
         合成车牌图像
         
@@ -88,6 +88,7 @@ class ImageComposer:
                 - bool: True启用默认增强，False禁用增强
                 - EnhanceConfig: 使用增强配置对象
                 - TransformConfig: 使用变换配置（自动转换为EnhanceConfig）
+            convert_double_to_single: 是否将双层车牌转换为单层显示
             
         Returns:
             np.ndarray: 合成的车牌图像
@@ -142,6 +143,10 @@ class ImageComposer:
             
             # 最终后处理
             final_img = self._apply_final_processing(background_img)
+            
+            # 如果需要将双层车牌转换为单层
+            if convert_double_to_single and plate_info.is_double_layer:
+                final_img = self._convert_double_to_single_layer(final_img, plate_info)
             
             # 应用变换效果（如果启用增强）
             if enhance_config.enabled and enhance_config.transform_config:
@@ -488,3 +493,65 @@ class ImageComposer:
         """应用最终图像处理"""
         # 轻微模糊以模拟真实车牌效果
         return cv2.blur(img, (3, 3))
+    
+    def _convert_double_to_single_layer(self, double_img: np.ndarray, plate_info: PlateInfo) -> np.ndarray:
+        """
+        将双层车牌转换为单层显示
+        
+        上下行分割，拼接成单层，最终拼接图像的高度与第二行字符对齐
+        
+        Args:
+            double_img: 双层车牌图像
+            plate_info: 车牌信息
+            
+        Returns:
+            np.ndarray: 转换后的单层车牌图像
+        """
+        try:
+            height, width = double_img.shape[:2]
+            logging.debug(f"原双层车牌尺寸: {width}x{height}")
+            
+            # 根据双层车牌配置分割上下两行
+            # 上行区域（包含前两个字符）
+            top_start = 15  # 上层Y偏移
+            top_end = top_start + 60  # 上层字符高度
+            
+            # 下行区域（包含后五个字符）
+            bottom_start = 90  # 下层Y偏移  
+            bottom_end = bottom_start + 110  # 下层字符高度
+            
+            # 提取上下两行，同时去掉左右黑边
+            crop_left = 20   # 左侧裁剪像素数
+            crop_right = 20  # 右侧裁剪像素数
+            
+            top_row = double_img[top_start:top_end, crop_left:width-crop_right, :]
+            bottom_row = double_img[bottom_start:bottom_end, crop_left:width-crop_right, :]
+            
+            # 更新实际内容宽度
+            content_width = width - crop_left - crop_right
+            
+            # 计算单层车牌的新尺寸
+            # 宽度：两个内容区域宽度 + 间隔
+            gap = 30  # 行间间隔
+            single_width = content_width + content_width + gap
+            # 高度：使用下行高度（保留车牌本身的上下边距）
+            single_height = bottom_row.shape[0]
+            
+            # 创建新的单层背景
+            # 使用与原车牌相同的背景色
+            bg_color = double_img[bottom_start + 50, 50, :]  # 取下层中心的背景色作为参考
+            single_img = np.full((single_height, single_width, 3), bg_color, dtype=np.uint8)
+            
+            # 将上行调整为与下行相同的高度
+            top_row_resized = cv2.resize(top_row, (content_width, single_height))
+            
+            # 拼接到单层图像
+            single_img[0:single_height, 0:content_width] = top_row_resized  # 左侧放置上行
+            single_img[0:single_height, content_width + gap:content_width + gap + content_width] = bottom_row  # 右侧放置下行
+            
+            logging.debug(f"转换后单层车牌尺寸: {single_width}x{single_height}")
+            return single_img
+            
+        except Exception as e:
+            logging.warning(f"双层转单层失败，返回原图像: {str(e)}")
+            return double_img
