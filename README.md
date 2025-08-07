@@ -8,7 +8,12 @@
 - **全面的车牌类型支持**：覆盖普通汽车、新能源、警车、~~军队~~、港澳、使领馆等所有主流车牌。
 - **模块化规则引擎**：所有车牌的编码规则、样式、颜色均在独立的规则类中定义，易于维护和扩展。
 - **高质量图像合成**：支持基于标准字体和尺寸生成高度真实的车牌图像。
-- **智能增强变换系统**：内置车牌老化效果、透视变换、光照模拟等真实场景效果，支持可配置概率（默认0.3）。
+- **🆕 高度自定义增强系统**：
+  - 支持 `bool`、`TransformConfig`、`EnhanceConfig` 等多种配置方式
+  - 内置11种增强效果：老化、透视、光照等真实场景模拟
+  - 支持精确的概率控制和强度调节 
+  - 配置文件保存/加载，便于批量应用
+  - 完全向后兼容现有代码
 - **灵活的生成方式**：
   - **随机生成**：一键生成符合真实世界分布的随机车牌。
   - **配置生成**：可指定省份、地区、车牌类型等参数。
@@ -129,6 +134,30 @@ cv2.imwrite(f"normal_{plate_info.plate_number}.jpg", normal_image)
 cv2.imwrite(f"enhanced_{plate_info.plate_number}.jpg", enhanced_image)
 ```
 
+#### 默认增强配置详情
+
+当设置 `enhance=True` 时，系统将应用以下默认配置：
+
+**老化效果 (Aging Effects):**
+- `wear_effect`: 磨损效果 (30%概率, 强度0.1-0.6)
+- `fade_effect`: 褪色效果 (30%概率, 强度0.1-0.5)  
+- `dirt_effect`: 污渍效果 (20%概率, 强度0.1-0.4)
+
+**透视变换 (Perspective Transform):**
+- `tilt_transform`: 倾斜变换 (40%概率, 角度0-15°)
+- `perspective_transform`: 透视变换 (30%概率, 强度0.1-0.4)
+- `rotation_transform`: 旋转变换 (20%概率, 角度0-10°)
+
+**光照效果 (Lighting Effects):**
+- `shadow_effect`: 阴影效果 (30%概率, 强度0.2-0.6)
+- `reflection_effect`: 反光效果 (20%概率, 强度0.1-0.4)
+- `night_effect`: 夜间效果 (20%概率, 强度0.2-0.7)
+- `backlight_effect`: 背光效果 (20%概率, 强度0.1-0.5)
+
+**全局设置:**
+- 全局概率乘子: 0.3 (30%)
+- 最大并发变换数: 3个
+
 ### 6. 独立使用变换效果
 
 ```python
@@ -160,21 +189,87 @@ result_image, transforms = transformer.apply(
 print(f"应用了 {len(transforms)} 种变换效果")
 ```
 
-### 7. 自定义变换配置
+### 6. 高度自定义增强配置 🆕
+
+项目现已支持高度自定义的增强配置，`enhance` 参数不仅支持 `bool` 值，还支持自定义的 `TransformConfig` 对象：
 
 ```python
-from src.transform import TransformConfig, CompositeTransform
 from src.generator.integrated_generator import IntegratedPlateGenerator
+from src.transform.transform_config import TransformConfig, TransformParams, TransformType
+from src.core.enhance_config import EnhanceConfig
 
-# 创建自定义变换配置
+generator = IntegratedPlateGenerator()
+
+# 方式1: 基础用法 (向后兼容)
+plate_info, image = generator.generate_plate_with_image(enhance=False)  # 无增强
+plate_info, image = generator.generate_plate_with_image(enhance=True)   # 默认增强
+
+# 方式2: 直接传递自定义TransformConfig
+custom_config = TransformConfig()
+custom_config.set_global_probability(0.8)  # 提高到80%概率
+custom_config.disable_transform('night_effect')  # 禁用夜间效果
+plate_info, image = generator.generate_plate_with_image(enhance=custom_config)
+
+# 方式3: 使用EnhanceConfig显式包装
+transform_config = TransformConfig()
+transform_config._transforms.clear()  # 清除默认配置
+# 只添加老化效果
+transform_config.add_transform(TransformParams(
+    name="heavy_aging",
+    transform_type=TransformType.AGING,
+    probability=1.0,  # 100%概率
+    intensity_range=(0.6, 0.9),  # 强烈效果
+    custom_params={
+        "wear_strength": 0.7,
+        "fade_factor": 0.4
+    }
+))
+
+enhance_config = EnhanceConfig(transform_config)
+print(f"配置状态: {enhance_config}")  # 显示配置信息
+plate_info, image = generator.generate_plate_with_image(enhance=enhance_config)
+
+# 方式4: 从文件加载配置
+transform_config.save_to_file("my_config.json")
+loaded_config = TransformConfig("my_config.json")
+plate_info, image = generator.generate_plate_with_image(enhance=loaded_config)
+```
+
+### 7. 变换配置管理
+
+```python
+from src.transform import TransformConfig, TransformParams, TransformType
+
+# 创建自定义配置
 config = TransformConfig()
-config.set_global_probability(0.5)  # 提高变换概率到50%
-config.update_transform_probability('wear_effect', 0.8)  # 磨损效果80%概率
-config.disable_transform('night_effect')  # 禁用夜间效果
 
-# 使用自定义配置的生成器
-generator = IntegratedPlateGenerator(transform_config=config)
-plate_info, image = generator.generate_plate_with_image(enhance=True)
+# 全局设置
+config.set_global_probability(0.5)          # 提高到50%概率
+config.set_max_concurrent_transforms(2)     # 最多同时应用2个变换
+
+# 按效果类型批量控制
+config.update_all_probabilities(0.6)        # 所有效果改为60%概率
+
+# 单个效果精确控制
+config.update_transform_probability('wear_effect', 0.8)
+config.disable_transform('night_effect')    # 禁用夜间效果
+config.enable_transform('shadow_effect')    # 启用阴影效果
+
+# 添加自定义变换
+config.add_transform(TransformParams(
+    name="custom_aging",
+    transform_type=TransformType.AGING,
+    probability=0.7,
+    intensity_range=(0.3, 0.8),
+    custom_params={
+        "wear_strength": 0.5,
+        "blur_kernel_size": 5
+    }
+))
+
+# 配置文件管理
+config.save_to_file("custom_enhance.json")   # 保存配置
+loaded = TransformConfig("custom_enhance.json")  # 加载配置
 ```
 
 ## 📁 项目结构
@@ -182,21 +277,43 @@ plate_info, image = generator.generate_plate_with_image(enhance=True)
 ```
 chinese_license_plate_generator/
 ├── src/
-│   ├── core/          # 核心模块 (配置, 异常)
+│   ├── core/          # 核心模块 (配置, 异常, 增强配置管理)
+│   │   ├── config.py
+│   │   ├── exceptions.py
+│   │   └── enhance_config.py  # 🆕 增强配置统一管理
 │   ├── generator/     # 车牌生成器模块
+│   │   ├── plate_generator.py
+│   │   ├── image_composer.py
+│   │   ├── font_manager.py
+│   │   └── integrated_generator.py
 │   ├── rules/         # 车牌编码规则模块
+│   │   ├── province_codes.py
+│   │   ├── regional_codes.py
+│   │   ├── sequence_generator.py
+│   │   ├── ordinary_plate.py
+│   │   ├── new_energy_plate.py
+│   │   └── special_plate.py
 │   ├── transform/     # 图像增强变换模块
+│   │   ├── transform_config.py
+│   │   ├── composite_transform.py
+│   │   ├── aging_effects.py
+│   │   ├── perspective_transform.py
+│   │   └── lighting_effects.py
 │   ├── utils/         # 工具模块
 │   └── validators/    # 验证器模块
 ├── tests/             # 单元测试和集成测试
 │   ├── test_generator/
 │   ├── test_rules/
 │   ├── test_transform/
-│   └── test_validators/
+│   ├── test_validators/
+│   ├── test_enhance_config.py      # 🆕 增强配置测试
+│   └── test_enhance_integration.py # 🆕 增强集成测试
 ├── font_model/        # 字体资源
 ├── plate_model/       # 车牌底板资源
-├── demo_transform_effects.py     # 变换效果演示脚本
-├── performance_test_transform.py # 性能测试脚本
+├── example_enhance_config.py       # 🆕 增强配置使用示例
+├── demo_transform_effects.py      # 变换效果演示脚本
+├── performance_test_transform.py  # 性能测试脚本
+├── generate_by_province.py        # 按省份批量生成工具
 ├── CLAUDE.md          # AI 协作指南
 ├── PLANNING.md        # 项目规划
 ├── TASK.md            # 任务跟踪
@@ -215,9 +332,11 @@ pip install pytest
 pytest
 
 # 运行特定模块测试
-pytest tests/test_transform/  # 测试变换效果
-pytest tests/test_rules/      # 测试编码规则
-pytest tests/test_generator/  # 测试生成器
+pytest tests/test_transform/         # 测试变换效果
+pytest tests/test_rules/             # 测试编码规则
+pytest tests/test_generator/         # 测试生成器
+pytest tests/test_enhance_config.py  # 🆕 测试增强配置
+pytest tests/test_enhance_integration.py  # 🆕 测试增强集成
 ```
 
 ## 🎨 演示和工具
@@ -235,7 +354,16 @@ python demo_transform_effects.py --effects aging perspective lighting
 
 # 指定输出目录
 python demo_transform_effects.py --output my_demo_results
+
+# 🆕 演示高度自定义增强配置
+python example_enhance_config.py
 ```
+
+此脚本将展示：
+- 6种不同的enhance参数使用方式
+- 从基础bool值到复杂自定义配置的全面演示
+- 配置文件保存和加载示例
+- 各种变换类型的组合效果
 
 ### 性能测试
 
@@ -351,6 +479,11 @@ config.disable_transform_type(TransformType.LIGHTING)  # 禁用所有光照效�
 - [x] **车牌老化效果** (磨损、褪色等真实效果) ✅ 已完成
 - [x] **不同拍摄角度** (倾斜、透视变换等) ✅ 已完成  
 - [x] **光照条件模拟** (阴影、反光、夜间等) ✅ 已完成
+- [x] **🆕 高度自定义增强配置系统** ✅ 已完成
+  - [x] EnhanceConfig统一配置管理
+  - [x] 支持4种输入类型：bool/TransformConfig/EnhanceConfig/None
+  - [x] 配置文件保存和加载功能
+  - [x] 完全向后兼容，100%测试覆盖
 - [ ] **背景环境生成** (街道、停车场等真实场景)
 
 ### 开发优先级建议
