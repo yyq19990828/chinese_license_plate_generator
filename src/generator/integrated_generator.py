@@ -4,7 +4,7 @@
 整合车牌生成器、图像合成器和字体管理器，提供完整的车牌生成解决方案。
 """
 
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Union
 import numpy as np
 import os
 import logging
@@ -13,6 +13,7 @@ from .plate_generator import PlateGenerator, PlateInfo, PlateGenerationConfig
 from .image_composer import ImageComposer  
 from .font_manager import FontManager
 from ..core.exceptions import PlateGenerationError
+from ..core.enhance_config import EnhanceConfig
 from ..transform.transform_config import TransformConfig
 
 
@@ -51,13 +52,17 @@ class IntegratedPlateGenerator:
         self._validate_resources()
     
     def generate_plate_with_image(self, config: Optional[PlateGenerationConfig] = None, 
-                                enhance: bool = False) -> Tuple[PlateInfo, np.ndarray]:
+                                enhance: Union[bool, TransformConfig, EnhanceConfig, None] = False) -> Tuple[PlateInfo, np.ndarray]:
         """
         生成车牌号码和对应图像
         
         Args:
             config: 生成配置
-            enhance: 是否启用图像增强
+            enhance: 增强配置
+                - bool: True启用默认增强，False禁用增强
+                - TransformConfig: 使用自定义变换配置
+                - EnhanceConfig: 使用增强配置对象
+                - None: 禁用增强
             
         Returns:
             Tuple[PlateInfo, np.ndarray]: 车牌信息和图像
@@ -69,8 +74,10 @@ class IntegratedPlateGenerator:
             logging.debug(f"生成车牌信息: {plate_info.plate_number} ({plate_info.plate_type}, {plate_info.background_color})")
             
             logging.debug("开始合成车牌图像...")
+            # 创建增强配置
+            enhance_config = EnhanceConfig(enhance)
             # 生成车牌图像
-            plate_image = self.image_composer.compose_plate_image(plate_info, enhance)
+            plate_image = self.image_composer.compose_plate_image(plate_info, enhance_config)
             logging.debug(f"车牌图像合成完成，尺寸: {plate_image.shape}")
             
             return plate_info, plate_image
@@ -80,13 +87,17 @@ class IntegratedPlateGenerator:
             raise PlateGenerationError(f"集成生成失败: {str(e)}")
     
     def generate_specific_plate_with_image(self, plate_number: str, 
-                                         enhance: bool = False) -> Tuple[PlateInfo, np.ndarray]:
+                                         enhance: Union[bool, TransformConfig, EnhanceConfig, None] = False) -> Tuple[PlateInfo, np.ndarray]:
         """
         生成指定号码的车牌和图像
         
         Args:
             plate_number: 车牌号码
-            enhance: 是否启用图像增强
+            enhance: 增强配置
+                - bool: True启用默认增强，False禁用增强
+                - TransformConfig: 使用自定义变换配置
+                - EnhanceConfig: 使用增强配置对象
+                - None: 禁用增强
             
         Returns:
             Tuple[PlateInfo, np.ndarray]: 车牌信息和图像
@@ -95,8 +106,10 @@ class IntegratedPlateGenerator:
             # 生成车牌信息
             plate_info = self.plate_generator.generate_specific_plate(plate_number)
             
+            # 创建增强配置
+            enhance_config = EnhanceConfig(enhance)
             # 生成车牌图像
-            plate_image = self.image_composer.compose_plate_image(plate_info, enhance)
+            plate_image = self.image_composer.compose_plate_image(plate_info, enhance_config)
             
             return plate_info, plate_image
             
@@ -105,14 +118,18 @@ class IntegratedPlateGenerator:
     
     def generate_batch_plates_with_images(self, count: int, 
                                         config: Optional[PlateGenerationConfig] = None,
-                                        enhance: bool = False) -> List[Tuple[PlateInfo, np.ndarray]]:
+                                        enhance: Union[bool, TransformConfig, EnhanceConfig, None] = False) -> List[Tuple[PlateInfo, np.ndarray]]:
         """
         批量生成车牌和图像
         
         Args:
             count: 生成数量
             config: 生成配置
-            enhance: 是否启用图像增强
+            enhance: 增强配置
+                - bool: True启用默认增强，False禁用增强
+                - TransformConfig: 使用自定义变换配置
+                - EnhanceConfig: 使用增强配置对象
+                - None: 禁用增强
             
         Returns:
             List[Tuple[PlateInfo, np.ndarray]]: 车牌信息和图像列表

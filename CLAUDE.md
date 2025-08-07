@@ -36,7 +36,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### ✅ Task Completion
 
 - **Mark completed tasks in `TASK.md`** immediately after finishing them.
-- Add new sub-tasks or TODOs discovered during development to `TASK.md` under a “Discovered During Work” section.
+- Add new sub-tasks or TODOs discovered during development to `TASK.md` under a "Discovered During Work" section.
 
 ### 📎 Style & Conventions
 
@@ -106,3 +106,4 @@ This repository is a Chinese license plate generator.
 *   永远用中文回复
 *   不要索引和查找git项目中 @.gitignore 文件忽略的内容
 *   所有响应必须显示可点击的代码构造和文件名引用, 必须使用相对路径
+*   测试python脚本时优先使用conda的虚拟环境

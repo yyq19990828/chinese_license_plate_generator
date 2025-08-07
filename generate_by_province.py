@@ -33,7 +33,7 @@ def parse_args():
                         help='为该省份生成的车牌数量')
     
     parser.add_argument('--save-dir', 
-                        default='province_output', 
+                        default='output_province', 
                         help='车牌图像保存的根目录')
                         
     parser.add_argument('--double-ratio',
@@ -87,7 +87,7 @@ if __name__ == '__main__':
             )
 
             # 生成车牌信息和图像
-            plate_info, plate_image = generator.generate_plate_with_image(config)
+            plate_info, plate_image = generator.generate_plate_with_image(config, enhance=True)
             
             # 格式化文件名
             layer_str = "double" if plate_info.is_double_layer else "single"

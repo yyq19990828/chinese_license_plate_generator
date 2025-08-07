@@ -5,7 +5,7 @@
 支持不同车牌类型的自动布局计算、字符颜色判断和双层车牌处理。
 """
 
-from typing import Tuple, List, Optional, Dict, Any
+from typing import Tuple, List, Optional, Dict, Any, Union
 import numpy as np
 import cv2
 import os
@@ -19,6 +19,7 @@ from ..utils.constants import PlateType
 from ..core.exceptions import PlateGenerationError
 from ..transform.composite_transform import CompositeTransform
 from ..transform.transform_config import TransformConfig, default_config
+from ..core.enhance_config import EnhanceConfig
 
 
 
@@ -77,13 +78,16 @@ class ImageComposer:
         # 初始化变换管理器
         self.transform_manager = CompositeTransform(transform_config or default_config)
         
-    def compose_plate_image(self, plate_info: PlateInfo, enhance: bool = False) -> np.ndarray:
+    def compose_plate_image(self, plate_info: PlateInfo, enhance: Union[bool, EnhanceConfig, TransformConfig] = False) -> np.ndarray:
         """
         合成车牌图像
         
         Args:
             plate_info: 车牌信息
-            enhance: 是否启用图像增强
+            enhance: 增强配置
+                - bool: True启用默认增强，False禁用增强
+                - EnhanceConfig: 使用增强配置对象
+                - TransformConfig: 使用变换配置（自动转换为EnhanceConfig）
             
         Returns:
             np.ndarray: 合成的车牌图像
@@ -93,6 +97,16 @@ class ImageComposer:
         """
         logging.debug(f"开始合成车牌图像: {plate_info.plate_number}, 类型: {plate_info.plate_type}, 背景: {plate_info.background_color}")
         try:
+            # 处理增强配置
+            if isinstance(enhance, bool):
+                enhance_config = EnhanceConfig(enhance)
+            elif isinstance(enhance, EnhanceConfig):
+                enhance_config = enhance
+            elif isinstance(enhance, TransformConfig):
+                enhance_config = EnhanceConfig(enhance)
+            else:
+                enhance_config = EnhanceConfig(False)
+            
             # 计算布局
             layout = self._calculate_layout(plate_info)
             logging.debug(f"使用布局: 宽度={layout.width}, 高度={layout.height}, 字体前缀='{layout.font_prefix}'")
@@ -112,7 +126,7 @@ class ImageComposer:
                 char_img = self._load_character_image(char, layout.font_prefix, plate_info, i)
                 
                 # 应用图像增强
-                if enhance:
+                if enhance_config.enabled:
                     char_img = self._apply_character_enhancement(char_img)
                 
                 # 合成到背景上
@@ -130,8 +144,8 @@ class ImageComposer:
             final_img = self._apply_final_processing(background_img)
             
             # 应用变换效果（如果启用增强）
-            if enhance:
-                final_img = self._apply_transform_effects(final_img)
+            if enhance_config.enabled and enhance_config.transform_config:
+                final_img = self._apply_transform_effects(final_img, enhance_config.transform_config)
             
             logging.info(f"车牌图像合成成功: {plate_info.plate_number}")
             return final_img
@@ -408,12 +422,13 @@ class ImageComposer:
         else:
             return cv2.dilate(char_img, kernel, iterations=1)
     
-    def _apply_transform_effects(self, image: np.ndarray) -> np.ndarray:
+    def _apply_transform_effects(self, image: np.ndarray, transform_config: Optional[TransformConfig] = None) -> np.ndarray:
         """
         应用变换效果到最终图像
         
         Args:
             image: 输入图像(numpy array)
+            transform_config: 可选的变换配置，如果为None则使用默认配置
             
         Returns:
             np.ndarray: 应用变换后的图像
@@ -422,8 +437,13 @@ class ImageComposer:
             # 转换为PIL图像格式
             pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
             
-            # 应用复合变换
-            transformed_image, applied_transforms = self.transform_manager.apply(pil_image)
+            # 如果提供了自定义配置，创建临时变换管理器
+            if transform_config:
+                temp_transform_manager = CompositeTransform(transform_config)
+                transformed_image, applied_transforms = temp_transform_manager.apply(pil_image)
+            else:
+                # 使用默认变换管理器
+                transformed_image, applied_transforms = self.transform_manager.apply(pil_image)
             
             # 转换回numpy格式
             result_image = cv2.cvtColor(np.array(transformed_image), cv2.COLOR_RGB2BGR)

@@ -215,5 +215,142 @@
 
 ---
 
+## 任务: enhance参数优化 - 支持高度自定义变换配置
+**提出时间:** 2025-08-07
+**状态:** ✅ **已完成** (2025-08-07)
+
+### 背景:
+优化 `enhance` 参数，使其不仅可以接受 `bool` 值，还可以接受项目内高度自定义的 `TransformConfig` 变换配置对象，提供更灵活的图像增强控制。
+
+### 技术目标:
+1. **向后兼容**: 保持现有 `enhance=True/False` 用法不变
+2. **扩展支持**: 新增对 `TransformConfig` 对象的支持
+3. **类型安全**: 提供严格的类型检查和验证
+4. **易用性**: 提供便利函数和清晰的API
+
+### TODO:
+
+#### 第一阶段：设计和架构 ✅ **已完成** (2025-08-07)
+- [x] 分析当前代码结构，了解enhance参数的当前实现
+- [x] 设计enhance参数的配置结构，支持bool和自定义配置
+- [x] 创建 `EnhanceConfig` 统一配置管理类 (`src/core/enhance_config.py`)
+  - [x] 支持多种输入类型：`bool`、`TransformConfig`、`EnhanceConfig`、`None`
+  - [x] 提供类型验证和错误处理
+  - [x] 实现 `__bool__()` 和 `__repr__()` 方法
+  - [x] 添加便利函数和工厂方法
+  - [x] 支持EnhanceConfig嵌套（复制构造）
+
+#### 第二阶段：核心功能实现 ✅ **已完成** (2025-08-07)
+- [x] 修改 `IntegratedPlateGenerator` 类 (`src/generator/integrated_generator.py`)
+  - [x] 更新 `generate_plate_with_image` 方法签名支持四种类型
+  - [x] 更新 `generate_specific_plate_with_image` 方法
+  - [x] 更新 `generate_batch_plates_with_images` 方法
+  - [x] 添加完整的类型注解和文档字符串
+- [x] 修改 `ImageComposer` 类 (`src/generator/image_composer.py`)
+  - [x] 更新 `compose_plate_image` 方法支持所有参数类型
+  - [x] 修改 `_apply_transform_effects` 方法支持可选配置
+  - [x] 实现配置对象的智能处理逻辑
+  - [x] 修复EnhanceConfig嵌套支持问题
+
+#### 第三阶段：示例和文档 ✅ **已完成** (2025-08-07)
+- [x] 创建详细使用示例 (`example_enhance_config.py`)
+  - [x] 展示6种不同使用方式（包括EnhanceConfig显式使用）
+  - [x] 包含从基础到高级的配置示例
+  - [x] 演示配置文件的保存和加载
+  - [x] 提供不同变换类型的组合示例
+  - [x] 更新示例以正确展示EnhanceConfig用法
+  - [x] 添加详细的使用方式对比和说明
+
+#### 第四阶段：测试和验证 ✅ **已完成** (2025-08-07)
+- [x] 编写 `EnhanceConfig` 单元测试 (`tests/test_enhance_config.py`)
+  - [x] 测试所有初始化方式（包括EnhanceConfig嵌套）
+  - [x] 测试类型验证和错误处理
+  - [x] 测试配置更新和属性访问
+  - [x] 测试与文件配置的集成
+  - [x] 添加EnhanceConfig复制构造测试
+- [x] 编写集成测试 (`tests/test_enhance_integration.py`)
+  - [x] 测试与生成器的集成
+  - [x] 测试向后兼容性
+  - [x] 测试类型检查
+- [x] 进行功能验证测试
+  - [x] 验证基础功能正常工作
+  - [x] 验证向后兼容性
+  - [x] 验证新功能的正确性
+  - [x] 修复并验证EnhanceConfig嵌套使用场景
+
+### 使用示例:
+
+```python
+from src.generator.integrated_generator import IntegratedPlateGenerator
+from src.transform.transform_config import TransformConfig, TransformParams, TransformType
+from src.core.enhance_config import EnhanceConfig
+
+generator = IntegratedPlateGenerator("plate_model", "font_model")
+
+# 原有方式保持不变
+plate_info, plate_image = generator.generate_plate_with_image(config, enhance=False)  # 无增强
+plate_info, plate_image = generator.generate_plate_with_image(config, enhance=True)   # 默认增强
+
+# 方式1：直接传递TransformConfig（自动转换为EnhanceConfig）
+custom_config = TransformConfig()
+custom_config.set_global_probability(0.8)
+plate_info, plate_image = generator.generate_plate_with_image(config, enhance=custom_config)
+
+# 方式2：显式使用EnhanceConfig包装
+transform_config = TransformConfig()
+transform_config.add_transform(TransformParams(
+    name="strong_aging",
+    transform_type=TransformType.AGING,
+    probability=1.0,
+    intensity_range=(0.6, 0.9)
+))
+enhance_config = EnhanceConfig(transform_config)
+plate_info, plate_image = generator.generate_plate_with_image(config, enhance=enhance_config)
+
+# 方式3：使用便利函数
+from src.core.enhance_config import create_enhance_config
+enhance_config = create_enhance_config(transform_config)
+plate_info, plate_image = generator.generate_plate_with_image(config, enhance=enhance_config)
+```
+
+### 技术亮点:
+1. **类型安全**: 使用 `Union` 类型注解和运行时类型检查
+2. **向后兼容**: 100% 保持现有API不变
+3. **扩展性**: 支持任意复杂的变换配置组合
+4. **易用性**: 提供便利函数和清晰的错误信息
+5. **测试覆盖**: 完整的单元测试和集成测试
+
+### 验收标准:
+1. **功能完整性**: 支持 `bool`、`TransformConfig`、`EnhanceConfig`、`None` 四种输入类型 ✅
+2. **向后兼容**: 现有代码无需修改即可正常工作 ✅
+3. **类型安全**: 提供严格的类型检查和验证 ✅
+4. **测试覆盖**: 单元测试通过率 100%（15个测试用例全部通过）✅
+5. **文档完整**: 包含详细使用示例和API文档 ✅
+6. **EnhanceConfig正确使用**: 示例代码正确展示EnhanceConfig的各种用法 ✅
+
+---
+
 ### 发现的额外任务:
-#### 在开发过程中发现的任务将在此处记录
+
+#### 任务: EnhanceConfig设计问题修复 ✅ **已完成** (2025-08-07)
+**发现时间:** 2025-08-07  
+**问题描述:** 在完成enhance参数优化后，发现EnhanceConfig的设计存在不一致问题：
+1. 示例代码中直接传递TransformConfig而非使用EnhanceConfig
+2. EnhanceConfig构造函数不支持接收EnhanceConfig对象（嵌套问题）
+3. 类型注解不完整，缺少EnhanceConfig类型支持
+
+**解决方案:**
+- [x] 修复EnhanceConfig构造函数，支持EnhanceConfig嵌套（复制构造）
+- [x] 更新所有相关类的类型注解，支持四种类型：`Union[bool, TransformConfig, EnhanceConfig, None]`
+- [x] 修复ImageComposer中的处理逻辑，正确处理所有输入类型
+- [x] 更新示例代码，展示EnhanceConfig的正确使用方式
+- [x] 添加EnhanceConfig嵌套使用的单元测试
+- [x] 更新文档说明，澄清不同使用方式的优势
+
+**技术细节:**
+- 在`EnhanceConfig._parse_enhance_config()`中添加EnhanceConfig类型处理
+- 更新错误消息包含所有支持的类型
+- 示例代码展示3种主要使用方式：直接传递、显式包装、便利函数
+- 保持完全向后兼容性
+
+#### 在开发过程中发现的其他任务将在此处记录
