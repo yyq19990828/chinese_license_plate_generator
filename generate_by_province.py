@@ -96,7 +96,14 @@ if __name__ == '__main__':
             
             # 格式化文件名
             layer_str = "double" if plate_info.is_double_layer else "single"
-            filename = f"{plate_info.plate_number}_{plate_info.background_color}_{layer_str}.jpg"
+            # 处理背景颜色（可能是枚举或字符串）
+            bg_color_str = (plate_info.background_color.value 
+                           if hasattr(plate_info.background_color, 'value') 
+                           else plate_info.background_color)
+            # 将 green_yellow 也当作 green 处理
+            if bg_color_str == "green_yellow":
+                bg_color_str = "green"
+            filename = f"{plate_info.plate_number}_{bg_color_str}_{layer_str}.jpg"
             filepath = os.path.join(province_save_path, filename)
             cv2.imwrite(filepath, plate_image)
 

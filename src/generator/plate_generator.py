@@ -397,10 +397,10 @@ class PlateGenerator:
         color_map = {
             PlateType.ORDINARY_BLUE: "blue",
             PlateType.ORDINARY_YELLOW: "yellow", 
-            PlateType.NEW_ENERGY_GREEN: "green_car",
+            PlateType.NEW_ENERGY_GREEN: "green",
             PlateType.POLICE_WHITE: "white",
-            PlateType.MILITARY_WHITE: "white_army",
-            PlateType.EMBASSY_BLACK: "black_shi" if '使' in plate_number else "black",
+            PlateType.MILITARY_WHITE: "white",
+            PlateType.EMBASSY_BLACK: "black",
             PlateType.HONGKONG_BLACK: "black",
             PlateType.MACAO_BLACK: "black",
             PlateType.ORDINARY_COACH: "yellow",

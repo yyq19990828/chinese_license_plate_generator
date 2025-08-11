@@ -44,6 +44,9 @@ if __name__ == '__main__':
             layer_type = "double" if plate_info.is_double_layer else "single"
             plate_type_str = plate_info.plate_type.value if hasattr(plate_info.plate_type, 'value') else str(plate_info.plate_type)
             bg_color_str = plate_info.background_color.value if hasattr(plate_info.background_color, 'value') else str(plate_info.background_color)
+            # 将 green_yellow 也当作 green 处理
+            if bg_color_str == "green_yellow":
+                bg_color_str = "green"
             filename = f"{plate_info.plate_number}_{bg_color_str}_{layer_type}.jpg"
             filepath = os.path.join(args.save_adr, filename)
             cv2.imwrite(filepath, plate_image)
